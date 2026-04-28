@@ -12,6 +12,9 @@ venv/
 # Environment files
 .env
 
+# Packaging artifacts
+*.egg-info/
+
 # OS/editor
 .DS_Store
 Thumbs.db
