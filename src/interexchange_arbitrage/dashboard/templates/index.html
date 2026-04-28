@@ -4,36 +4,62 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ArbBot Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
   <main class="layout">
-    <section class="hero card">
-      <h1>ArbBot Control Center</h1>
-      <p>Configure scanner parameters, trigger test run, and watch signal snapshots.</p>
-      <div class="status-row">
-        <span>Service status:</span>
-        <span class="badge {{ service_status }}">{{ service_status }}</span>
+    <header class="hero card">
+      <div>
+        <p class="eyebrow">Inter-Exchange Spot Arbitrage</p>
+        <h1>ArbBot Operator Dashboard</h1>
+        <p class="subtitle">Manage scanner parameters, execute test scans, and monitor live opportunities from one control room.</p>
       </div>
-      <form method="post" action="/scan-test">
-        <button type="submit">Run One-Off Scan</button>
-      </form>
-    </section>
+      <div class="hero-actions">
+        <div class="status-row">
+          <span>Service status</span>
+          <span class="badge {{ service_status }}">{{ service_status }}</span>
+        </div>
+        <form method="post" action="/scan-test">
+          <button type="submit">Run One-Off Scan</button>
+        </form>
+      </div>
+    </header>
 
     {% if messages %}
-    <section class="card">
+    <section class="card info">
       {% for message in messages %}
       <p>{{ message }}</p>
       {% endfor %}
     </section>
     {% endif %}
 
+    <section class="stats-grid">
+      <article class="card stat">
+        <p class="stat-label">Rows In Snapshot</p>
+        <p class="stat-value">{{ signals|length }}</p>
+      </article>
+      <article class="card stat">
+        <p class="stat-label">Latest Service State</p>
+        <p class="stat-value status-text">{{ service_status }}</p>
+      </article>
+      <article class="card stat">
+        <p class="stat-label">Tracked Pairs</p>
+        <p class="stat-value">{{ settings.SYMBOLS }}</p>
+      </article>
+    </section>
+
     {% if scan_result %}
     <section class="card">
-      <h2>Scan Result</h2>
-      <p>Filtered opportunities: {{ scan_result.filtered_opportunities|length }}</p>
-      <p>Candidate opportunities: {{ scan_result.all_candidates|length }}</p>
+      <h2>Latest Manual Scan</h2>
+      <div class="scan-summary">
+        <p><strong>Filtered opportunities:</strong> {{ scan_result.filtered_opportunities|length }}</p>
+        <p><strong>Candidate opportunities:</strong> {{ scan_result.all_candidates|length }}</p>
+      </div>
       {% if scan_result.warnings %}
+      <h3>Warnings</h3>
       <ul>
         {% for warning in scan_result.warnings[:5] %}
         <li>{{ warning }}</li>
@@ -45,6 +71,7 @@
 
     <section class="card">
       <h2>Scanner Settings</h2>
+      <p class="section-note">Changes are written into the runtime .env file and picked up on the next scan cycle.</p>
       <form class="settings-grid" method="post" action="/settings">
         <label>SYMBOLS<input name="symbols" value="{{ settings.SYMBOLS }}" /></label>
         <label>ENABLED_EXCHANGES<input name="enabled_exchanges" value="{{ settings.ENABLED_EXCHANGES }}" /></label>
@@ -69,6 +96,7 @@
 
     <section class="card">
       <h2>Latest Signal Snapshots</h2>
+      <p class="section-note">Showing up to 30 latest records from the CSV snapshot feed.</p>
       {% if signals %}
       <div class="table-wrap">
         <table>
@@ -86,7 +114,7 @@
             {% for row in signals[:30] %}
             <tr>
               <td>{{ row.run_at_utc }}</td>
-              <td>{{ row.symbol }}</td>
+              <td><span class="chip">{{ row.symbol }}</span></td>
               <td>{{ row.buy_exchange }}</td>
               <td>{{ row.sell_exchange }}</td>
               <td>{{ row.net_spread_pct }}</td>
@@ -97,7 +125,7 @@
         </table>
       </div>
       {% else %}
-      <p>No snapshot rows yet.</p>
+      <p class="empty">No snapshot rows yet.</p>
       {% endif %}
     </section>
   </main>
