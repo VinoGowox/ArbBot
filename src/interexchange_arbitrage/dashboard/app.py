@@ -6,6 +6,7 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+
 from dotenv import set_key
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import RedirectResponse
@@ -65,6 +66,54 @@ def _read_signals(csv_path: str, limit: int = 30) -> list[dict[str, str]]:
     return list(reversed(rows[-limit:]))
 
 
+def _safe_float(value: str | None) -> float:
+    if value is None:
+        return 0.0
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _build_chart_data(signals: list[dict[str, str]]) -> dict[str, list[float] | list[str]]:
+    # Reverse for left-to-right chronological chart rendering.
+    asc = list(reversed(signals))
+    labels = [row.get("run_at_utc", "")[-8:] for row in asc]
+    net_spread = [_safe_float(row.get("net_spread_pct")) for row in asc]
+    profit_quote = [_safe_float(row.get("estimated_profit_quote")) for row in asc]
+    return {
+        "labels": labels,
+        "net_spread": net_spread,
+        "profit_quote": profit_quote,
+    }
+
+
+def _dashboard_context(
+    request: Request,
+    settings: Settings,
+    signals: list[dict[str, str]],
+    status: str,
+    scan_result: ScanResult | None,
+    messages: list[str],
+) -> dict[str, Any]:
+    chart_data = _build_chart_data(signals)
+    latest_net_spread = _safe_float(signals[0].get("net_spread_pct")) if signals else 0.0
+    latest_profit_quote = (
+        _safe_float(signals[0].get("estimated_profit_quote")) if signals else 0.0
+    )
+
+    return {
+        "settings": _settings_payload(settings),
+        "signals": signals,
+        "service_status": status,
+        "scan_result": scan_result,
+        "messages": messages,
+        "chart_data": chart_data,
+        "latest_net_spread": latest_net_spread,
+        "latest_profit_quote": latest_profit_quote,
+    }
+
+
 def _settings_payload(settings: Settings) -> dict[str, str]:
     return {
         "SYMBOLS": ",".join(settings.symbols),
@@ -104,13 +153,7 @@ def dashboard(request: Request) -> Any:
     return templates.TemplateResponse(
         request,
         "index.html",
-        {
-            "settings": _settings_payload(settings),
-            "signals": signals,
-            "service_status": status,
-            "scan_result": None,
-            "messages": [],
-        },
+        _dashboard_context(request, settings, signals, status, None, []),
     )
 
 
@@ -165,11 +208,12 @@ def scan_test(request: Request) -> Any:
     return templates.TemplateResponse(
         request,
         "index.html",
-        {
-            "settings": _settings_payload(settings),
-            "signals": signals,
-            "service_status": status,
-            "scan_result": scan_result,
-            "messages": ["One-off scan finished from dashboard."],
-        },
+        _dashboard_context(
+            request,
+            settings,
+            signals,
+            status,
+            scan_result,
+            ["One-off scan finished from dashboard."],
+        ),
     )

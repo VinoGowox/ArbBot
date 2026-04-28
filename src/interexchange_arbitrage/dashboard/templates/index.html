@@ -10,124 +10,284 @@
   <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
-  <main class="layout">
-    <header class="hero card">
-      <div>
-        <p class="eyebrow">Inter-Exchange Spot Arbitrage</p>
-        <h1>ArbBot Operator Dashboard</h1>
-        <p class="subtitle">Manage scanner parameters, execute test scans, and monitor live opportunities from one control room.</p>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <p class="brand-kicker">ArbBot</p>
+        <h1>Control Panel</h1>
       </div>
-      <div class="hero-actions">
-        <div class="status-row">
-          <span>Service status</span>
-          <span class="badge {{ service_status }}">{{ service_status }}</span>
-        </div>
-        <form method="post" action="/scan-test">
-          <button type="submit">Run One-Off Scan</button>
-        </form>
-      </div>
-    </header>
-
-    {% if messages %}
-    <section class="card info">
-      {% for message in messages %}
-      <p>{{ message }}</p>
-      {% endfor %}
-    </section>
-    {% endif %}
-
-    <section class="stats-grid">
-      <article class="card stat">
-        <p class="stat-label">Rows In Snapshot</p>
-        <p class="stat-value">{{ signals|length }}</p>
-      </article>
-      <article class="card stat">
-        <p class="stat-label">Latest Service State</p>
-        <p class="stat-value status-text">{{ service_status }}</p>
-      </article>
-      <article class="card stat">
-        <p class="stat-label">Tracked Pairs</p>
-        <p class="stat-value">{{ settings.SYMBOLS }}</p>
-      </article>
-    </section>
-
-    {% if scan_result %}
-    <section class="card">
-      <h2>Latest Manual Scan</h2>
-      <div class="scan-summary">
-        <p><strong>Filtered opportunities:</strong> {{ scan_result.filtered_opportunities|length }}</p>
-        <p><strong>Candidate opportunities:</strong> {{ scan_result.all_candidates|length }}</p>
-      </div>
-      {% if scan_result.warnings %}
-      <h3>Warnings</h3>
-      <ul>
-        {% for warning in scan_result.warnings[:5] %}
-        <li>{{ warning }}</li>
-        {% endfor %}
-      </ul>
-      {% endif %}
-    </section>
-    {% endif %}
-
-    <section class="card">
-      <h2>Scanner Settings</h2>
-      <p class="section-note">Changes are written into the runtime .env file and picked up on the next scan cycle.</p>
-      <form class="settings-grid" method="post" action="/settings">
-        <label>SYMBOLS<input name="symbols" value="{{ settings.SYMBOLS }}" /></label>
-        <label>ENABLED_EXCHANGES<input name="enabled_exchanges" value="{{ settings.ENABLED_EXCHANGES }}" /></label>
-        <label>MIN_NET_SPREAD_PCT<input name="min_net_spread_pct" value="{{ settings.MIN_NET_SPREAD_PCT }}" /></label>
-        <label>MIN_NET_PROFIT_QUOTE<input name="min_net_profit_quote" value="{{ settings.MIN_NET_PROFIT_QUOTE }}" /></label>
-        <label>TRADE_SIZE_QUOTE<input name="trade_size_quote" value="{{ settings.TRADE_SIZE_QUOTE }}" /></label>
-        <label>SLIPPAGE_BPS<input name="slippage_bps" value="{{ settings.SLIPPAGE_BPS }}" /></label>
-        <label>SNAPSHOT_CSV_PATH<input name="snapshot_csv_path" value="{{ settings.SNAPSHOT_CSV_PATH }}" /></label>
-        <label>DEFAULT_TAKER_FEE_RATE<input name="default_taker_fee_rate" value="{{ settings.DEFAULT_TAKER_FEE_RATE }}" /></label>
-        <label>BINANCE_SPOT_FEE<input name="binance_spot_fee" value="{{ settings.BINANCE_SPOT_FEE }}" /></label>
-        <label>BYBIT_SPOT_FEE<input name="bybit_spot_fee" value="{{ settings.BYBIT_SPOT_FEE }}" /></label>
-        <label>OKX_SPOT_FEE<input name="okx_spot_fee" value="{{ settings.OKX_SPOT_FEE }}" /></label>
-        <label>KUCOIN_SPOT_FEE<input name="kucoin_spot_fee" value="{{ settings.KUCOIN_SPOT_FEE }}" /></label>
-        <label>TELEGRAM_ENABLED<input name="telegram_enabled" value="{{ settings.TELEGRAM_ENABLED }}" /></label>
-        <label>TELEGRAM_BOT_TOKEN<input name="telegram_bot_token" value="{{ settings.TELEGRAM_BOT_TOKEN }}" /></label>
-        <label>TELEGRAM_CHAT_ID<input name="telegram_chat_id" value="{{ settings.TELEGRAM_CHAT_ID }}" /></label>
-        <div class="full">
-          <button type="submit">Save Settings</button>
-        </div>
+      <nav class="menu">
+        <a href="#overview">Overview</a>
+        <a href="#settings">Settings</a>
+        <a href="#signals">Signal Feed</a>
+      </nav>
+      <section class="side-card">
+        <p class="side-label">Service</p>
+        <span class="badge {{ service_status }}">{{ service_status }}</span>
+      </section>
+      <form method="post" action="/scan-test" class="scan-form">
+        <button type="submit">Run Scan</button>
       </form>
-    </section>
+    </aside>
 
-    <section class="card">
-      <h2>Latest Signal Snapshots</h2>
-      <p class="section-note">Showing up to 30 latest records from the CSV snapshot feed.</p>
-      {% if signals %}
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>run_at_utc</th>
-              <th>symbol</th>
-              <th>buy_exchange</th>
-              <th>sell_exchange</th>
-              <th>net_spread_pct</th>
-              <th>estimated_profit_quote</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for row in signals[:30] %}
-            <tr>
-              <td>{{ row.run_at_utc }}</td>
-              <td><span class="chip">{{ row.symbol }}</span></td>
-              <td>{{ row.buy_exchange }}</td>
-              <td>{{ row.sell_exchange }}</td>
-              <td>{{ row.net_spread_pct }}</td>
-              <td>{{ row.estimated_profit_quote }}</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-      {% else %}
-      <p class="empty">No snapshot rows yet.</p>
+    <main class="main-content">
+      <section id="overview" class="panel head-panel">
+        <div>
+          <p class="eyebrow">Inter-Exchange Spot Arbitrage</p>
+          <h2>Operational Dashboard</h2>
+          <p class="subtitle">Modernized monitoring workspace for scanner health, spread behavior, and run snapshots.</p>
+        </div>
+      </section>
+
+      {% if messages %}
+      <section class="panel info">
+        {% for message in messages %}
+        <p>{{ message }}</p>
+        {% endfor %}
+      </section>
       {% endif %}
-    </section>
-  </main>
+
+      <section class="kpi-grid">
+        <article class="panel kpi">
+          <p class="kpi-label">Snapshot Rows</p>
+          <p class="kpi-value">{{ signals|length }}</p>
+        </article>
+        <article class="panel kpi">
+          <p class="kpi-label">Latest Net Spread %</p>
+          <p class="kpi-value">{{ "%.4f"|format(latest_net_spread) }}</p>
+        </article>
+        <article class="panel kpi">
+          <p class="kpi-label">Latest Profit Quote</p>
+          <p class="kpi-value">{{ "%.4f"|format(latest_profit_quote) }}</p>
+        </article>
+      </section>
+
+      <section class="charts-grid">
+        <article class="panel chart-panel">
+          <h3>Net Spread Trend</h3>
+          <canvas id="netSpreadChart"></canvas>
+        </article>
+        <article class="panel chart-panel">
+          <h3>Estimated Profit Trend</h3>
+          <canvas id="profitChart"></canvas>
+        </article>
+      </section>
+
+      {% if scan_result %}
+      <section class="panel">
+        <h3>Latest Manual Scan</h3>
+        <div class="scan-summary">
+          <p><strong>Filtered opportunities:</strong> {{ scan_result.filtered_opportunities|length }}</p>
+          <p><strong>Candidate opportunities:</strong> {{ scan_result.all_candidates|length }}</p>
+        </div>
+        {% if scan_result.warnings %}
+        <ul>
+          {% for warning in scan_result.warnings[:5] %}
+          <li>{{ warning }}</li>
+          {% endfor %}
+        </ul>
+        {% endif %}
+      </section>
+      {% endif %}
+
+      <section id="settings" class="panel">
+        <h3>Scanner Settings</h3>
+        <p class="section-note">Use structured controls below. Exchange and Telegram status are now configured with switches.</p>
+        <form class="settings-grid" method="post" action="/settings">
+          <label>Symbols
+            <textarea name="symbols" rows="2">{{ settings.SYMBOLS }}</textarea>
+          </label>
+
+          <div class="control-group full">
+            <p class="control-title">Enabled Exchanges</p>
+            <div class="exchange-switches" id="exchangeSwitches" data-current="{{ settings.ENABLED_EXCHANGES }}">
+              <button type="button" class="switch-chip" data-exchange="binance">Binance</button>
+              <button type="button" class="switch-chip" data-exchange="bybit">Bybit</button>
+              <button type="button" class="switch-chip" data-exchange="okx">OKX</button>
+              <button type="button" class="switch-chip" data-exchange="kucoin">KuCoin</button>
+            </div>
+            <input type="hidden" id="enabledExchangesInput" name="enabled_exchanges" value="{{ settings.ENABLED_EXCHANGES }}" />
+          </div>
+
+          <label>Min Net Spread %
+            <input type="number" step="0.0001" name="min_net_spread_pct" value="{{ settings.MIN_NET_SPREAD_PCT }}" />
+          </label>
+          <label>Min Net Profit Quote
+            <input type="number" step="0.0001" name="min_net_profit_quote" value="{{ settings.MIN_NET_PROFIT_QUOTE }}" />
+          </label>
+          <label>Trade Size Quote
+            <input type="number" step="0.01" name="trade_size_quote" value="{{ settings.TRADE_SIZE_QUOTE }}" />
+          </label>
+          <label>Slippage (BPS)
+            <input type="number" step="0.1" name="slippage_bps" value="{{ settings.SLIPPAGE_BPS }}" />
+          </label>
+          <label>Snapshot CSV Path
+            <input name="snapshot_csv_path" value="{{ settings.SNAPSHOT_CSV_PATH }}" />
+          </label>
+          <label>Default Taker Fee Rate
+            <input type="number" step="0.0001" name="default_taker_fee_rate" value="{{ settings.DEFAULT_TAKER_FEE_RATE }}" />
+          </label>
+          <label>Binance Spot Fee
+            <input type="number" step="0.0001" name="binance_spot_fee" value="{{ settings.BINANCE_SPOT_FEE }}" />
+          </label>
+          <label>Bybit Spot Fee
+            <input type="number" step="0.0001" name="bybit_spot_fee" value="{{ settings.BYBIT_SPOT_FEE }}" />
+          </label>
+          <label>OKX Spot Fee
+            <input type="number" step="0.0001" name="okx_spot_fee" value="{{ settings.OKX_SPOT_FEE }}" />
+          </label>
+          <label>KuCoin Spot Fee
+            <input type="number" step="0.0001" name="kucoin_spot_fee" value="{{ settings.KUCOIN_SPOT_FEE }}" />
+          </label>
+
+          <div class="control-group full telegram-row">
+            <p class="control-title">Telegram Alerts</p>
+            <label class="toggle">
+              <input type="checkbox" id="telegramToggle" {% if settings.TELEGRAM_ENABLED == "true" %}checked{% endif %} />
+              <span>Enable Telegram alert</span>
+            </label>
+            <input type="hidden" name="telegram_enabled" id="telegramEnabledInput" value="{{ settings.TELEGRAM_ENABLED }}" />
+          </div>
+
+          <label>Telegram Bot Token
+            <input name="telegram_bot_token" value="{{ settings.TELEGRAM_BOT_TOKEN }}" />
+          </label>
+          <label>Telegram Chat ID
+            <input name="telegram_chat_id" value="{{ settings.TELEGRAM_CHAT_ID }}" />
+          </label>
+
+          <div class="full">
+            <button type="submit">Save Settings</button>
+          </div>
+        </form>
+      </section>
+
+      <section id="signals" class="panel">
+        <h3>Latest Signal Snapshots</h3>
+        {% if signals %}
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>run_at_utc</th>
+                <th>symbol</th>
+                <th>buy_exchange</th>
+                <th>sell_exchange</th>
+                <th>net_spread_pct</th>
+                <th>estimated_profit_quote</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in signals[:30] %}
+              <tr>
+                <td>{{ row.run_at_utc }}</td>
+                <td><span class="chip">{{ row.symbol }}</span></td>
+                <td>{{ row.buy_exchange }}</td>
+                <td>{{ row.sell_exchange }}</td>
+                <td>{{ row.net_spread_pct }}</td>
+                <td>{{ row.estimated_profit_quote }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <p class="empty">No snapshot rows yet.</p>
+        {% endif %}
+      </section>
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <script>
+    const chartData = {{ chart_data | tojson }};
+
+    const baseChartOptions = {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#6b7280' }, grid: { color: 'rgba(148,163,184,0.12)' } },
+        y: { ticks: { color: '#6b7280' }, grid: { color: 'rgba(148,163,184,0.12)' } }
+      }
+    };
+
+    const netSpreadCtx = document.getElementById('netSpreadChart');
+    if (netSpreadCtx) {
+      new Chart(netSpreadCtx, {
+        type: 'line',
+        data: {
+          labels: chartData.labels,
+          datasets: [{
+            data: chartData.net_spread,
+            borderColor: '#0f766e',
+            backgroundColor: 'rgba(15,118,110,0.15)',
+            fill: true,
+            tension: 0.25,
+            pointRadius: 0
+          }]
+        },
+        options: baseChartOptions
+      });
+    }
+
+    const profitCtx = document.getElementById('profitChart');
+    if (profitCtx) {
+      new Chart(profitCtx, {
+        type: 'line',
+        data: {
+          labels: chartData.labels,
+          datasets: [{
+            data: chartData.profit_quote,
+            borderColor: '#1d4ed8',
+            backgroundColor: 'rgba(29,78,216,0.14)',
+            fill: true,
+            tension: 0.25,
+            pointRadius: 0
+          }]
+        },
+        options: baseChartOptions
+      });
+    }
+
+    const exchangeContainer = document.getElementById('exchangeSwitches');
+    const hiddenExchangeInput = document.getElementById('enabledExchangesInput');
+    if (exchangeContainer && hiddenExchangeInput) {
+      const current = new Set((exchangeContainer.dataset.current || '').split(',').map((v) => v.trim()).filter(Boolean));
+      const chips = Array.from(exchangeContainer.querySelectorAll('.switch-chip'));
+
+      const sync = () => {
+        chips.forEach((chip) => {
+          const name = chip.dataset.exchange;
+          chip.classList.toggle('active', current.has(name));
+        });
+        hiddenExchangeInput.value = Array.from(current).join(',');
+      };
+
+      chips.forEach((chip) => {
+        chip.addEventListener('click', () => {
+          const name = chip.dataset.exchange;
+          if (current.has(name)) {
+            current.delete(name);
+          } else {
+            current.add(name);
+          }
+          sync();
+        });
+      });
+
+      sync();
+    }
+
+    const telegramToggle = document.getElementById('telegramToggle');
+    const telegramHidden = document.getElementById('telegramEnabledInput');
+    if (telegramToggle && telegramHidden) {
+      const syncTelegram = () => {
+        telegramHidden.value = telegramToggle.checked ? 'true' : 'false';
+      };
+      telegramToggle.addEventListener('change', syncTelegram);
+      syncTelegram();
+    }
+  </script>
 </body>
 </html>
