@@ -40,6 +40,8 @@ Salin `.env.example` ke `.env`, lalu sesuaikan:
 - `TRADE_SIZE_QUOTE` contoh: `1000`
 - `SLIPPAGE_BPS` contoh: `2`
 - `SNAPSHOT_CSV_PATH` contoh: `data/arbitrage_opportunities.csv`
+- `SNAPSHOT_CSV_MAX_ROWS` contoh: `20000` (auto rotate saat baris data mencapai limit)
+- `SNAPSHOT_CSV_MAX_BACKUPS` contoh: `5` (jumlah backup file snapshot: `.1`, `.2`, dst)
 - `TELEGRAM_ENABLED` `true/false`
 - `TELEGRAM_BOT_TOKEN` dan `TELEGRAM_CHAT_ID` jika alert aktif
 - `PAPER_TRADING_ENABLED` `true/false`

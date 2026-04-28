@@ -4,6 +4,7 @@ import csv
 from datetime import datetime, timezone
 from pathlib import Path
 
+from interexchange_arbitrage.csv_cycle import rotate_csv_if_needed
 from interexchange_arbitrage.models import ArbitrageOpportunity
 
 
@@ -28,14 +29,23 @@ CSV_HEADERS = [
 def append_opportunities_csv(
     opportunities: list[ArbitrageOpportunity],
     csv_path: str,
+    *,
+    max_rows: int,
+    max_backups: int,
 ) -> None:
     if not opportunities:
         return
 
     path = Path(csv_path)
     path.parent.mkdir(parents=True, exist_ok=True)
+    rotate_csv_if_needed(
+        path,
+        CSV_HEADERS,
+        max_rows=max_rows,
+        max_backups=max_backups,
+    )
 
-    write_header = not path.exists()
+    write_header = not path.exists() or path.stat().st_size == 0
     run_at = datetime.now(timezone.utc).isoformat()
 
     with path.open("a", newline="", encoding="utf-8") as csv_file:

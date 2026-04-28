@@ -26,6 +26,8 @@ class Settings:
     paper_initial_base_balance: float
     paper_max_quote_per_trade: float
     paper_cooldown_seconds: int
+    snapshot_csv_max_rows: int
+    snapshot_csv_max_backups: int
     default_taker_fee_rate: float
     exchange_fee_rate: dict[str, float]
 
@@ -88,6 +90,8 @@ def load_settings(
     paper_initial_base_balance = float(get_value("PAPER_INITIAL_BASE_BALANCE", "0.1"))
     paper_max_quote_per_trade = float(get_value("PAPER_MAX_QUOTE_PER_TRADE", "1000"))
     paper_cooldown_seconds = int(get_value("PAPER_COOLDOWN_SECONDS", "60"))
+    snapshot_csv_max_rows = int(get_value("SNAPSHOT_CSV_MAX_ROWS", "20000"))
+    snapshot_csv_max_backups = int(get_value("SNAPSHOT_CSV_MAX_BACKUPS", "5"))
     default_taker_fee_rate = float(get_value("DEFAULT_TAKER_FEE_RATE", "0.001"))
 
     exchange_fee_rate = {
@@ -115,6 +119,8 @@ def load_settings(
         paper_initial_base_balance=paper_initial_base_balance,
         paper_max_quote_per_trade=paper_max_quote_per_trade,
         paper_cooldown_seconds=paper_cooldown_seconds,
+        snapshot_csv_max_rows=snapshot_csv_max_rows,
+        snapshot_csv_max_backups=snapshot_csv_max_backups,
         default_taker_fee_rate=default_taker_fee_rate,
         exchange_fee_rate=exchange_fee_rate,
     )

@@ -97,7 +97,7 @@ class PaperTradingEngine:
 
         path = Path(self.settings.paper_trades_csv_path)
         path.parent.mkdir(parents=True, exist_ok=True)
-        write_header = not path.exists()
+        write_header = not path.exists() or path.stat().st_size == 0
 
         with path.open("a", newline="", encoding="utf-8") as csv_file:
             writer = csv.writer(csv_file)

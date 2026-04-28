@@ -14,6 +14,8 @@ def _settings_base() -> dict:
         "paper_initial_base_balance": 0.1,
         "paper_max_quote_per_trade": 1000.0,
         "paper_cooldown_seconds": 60,
+        "snapshot_csv_max_rows": 20000,
+        "snapshot_csv_max_backups": 5,
     }
 
 

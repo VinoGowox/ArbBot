@@ -90,7 +90,12 @@ def run_scan(settings: Settings, *, persist_candidates: bool = True) -> ScanResu
         filtered_opportunities.extend(engine.scan_symbol(quotes, apply_thresholds=True))
 
     if persist_candidates:
-        append_opportunities_csv(all_candidates, settings.snapshot_csv_path)
+        append_opportunities_csv(
+            all_candidates,
+            settings.snapshot_csv_path,
+            max_rows=settings.snapshot_csv_max_rows,
+            max_backups=settings.snapshot_csv_max_backups,
+        )
 
     executed_paper_trades: list[PaperTrade] = []
     portfolio_summary: PortfolioSummary | None = None

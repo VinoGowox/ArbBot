@@ -24,6 +24,8 @@ def _build_settings(state_path: str, trades_path: str) -> Settings:
         paper_initial_base_balance=1.0,
         paper_max_quote_per_trade=1000.0,
         paper_cooldown_seconds=0,
+        snapshot_csv_max_rows=20000,
+        snapshot_csv_max_backups=5,
         default_taker_fee_rate=0.001,
         exchange_fee_rate={"binance": 0.001, "bybit": 0.001},
     )
