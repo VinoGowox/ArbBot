@@ -1,0 +1,134 @@
+:root {
+  --bg: #f4f2ea;
+  --card: #fffdf6;
+  --text: #1f1c17;
+  --muted: #6a6257;
+  --accent: #1b7f79;
+  --accent-soft: #d4efe7;
+  --danger: #8f2d56;
+  --border: #d8d2c5;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+  color: var(--text);
+  background: radial-gradient(circle at 10% 10%, #fef9ed 0%, var(--bg) 60%);
+}
+
+.layout {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px;
+  display: grid;
+  gap: 16px;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 18px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.05);
+}
+
+.hero h1 {
+  margin-top: 0;
+  margin-bottom: 8px;
+}
+
+.hero p {
+  margin-top: 0;
+  color: var(--muted);
+}
+
+.status-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.badge {
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.badge.active {
+  color: #0a534f;
+  background: var(--accent-soft);
+}
+
+.badge.inactive,
+.badge.failed,
+.badge.unknown {
+  color: white;
+  background: var(--danger);
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+input {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+  color: var(--text);
+  background: #fff;
+}
+
+.full {
+  grid-column: 1 / -1;
+}
+
+button {
+  border: 0;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #1b7f79, #306eeb);
+  color: white;
+  font-weight: 700;
+  padding: 10px 16px;
+  cursor: pointer;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 700px;
+}
+
+th,
+td {
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  padding: 8px;
+  font-size: 13px;
+}
+
+@media (max-width: 768px) {
+  .layout {
+    padding: 12px;
+  }
+}

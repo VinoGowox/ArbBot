@@ -1,0 +1,175 @@
+from __future__ import annotations
+
+import csv
+import os
+import subprocess
+from pathlib import Path
+from typing import Any
+
+from dotenv import set_key
+from fastapi import FastAPI, Form, Request
+from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+
+from interexchange_arbitrage.scanner import ScanResult, run_scan
+from interexchange_arbitrage.settings import Settings, load_settings
+
+BASE_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = BASE_DIR.parents[2]
+ENV_FILE = PROJECT_ROOT / ".env"
+ENV_EXAMPLE_FILE = PROJECT_ROOT / ".env.example"
+SERVICE_NAME = os.getenv("ARB_SERVICE_NAME", "interexchange-arbitrage")
+
+
+def _ensure_env_file() -> None:
+    if ENV_FILE.exists():
+        return
+    if ENV_EXAMPLE_FILE.exists():
+        ENV_FILE.write_text(ENV_EXAMPLE_FILE.read_text(encoding="utf-8"), encoding="utf-8")
+    else:
+        ENV_FILE.write_text("", encoding="utf-8")
+
+
+def _current_settings() -> Settings:
+    _ensure_env_file()
+    return load_settings(env_file=str(ENV_FILE))
+
+
+def _service_status() -> str:
+    try:
+        result = subprocess.run(
+            ["systemctl", "is-active", SERVICE_NAME],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=3,
+        )
+    except Exception:
+        return "unknown"
+
+    value = (result.stdout or result.stderr).strip().lower()
+    if not value:
+        return "unknown"
+    return value
+
+
+def _read_signals(csv_path: str, limit: int = 30) -> list[dict[str, str]]:
+    path = Path(csv_path)
+    if not path.exists() or path.stat().st_size == 0:
+        return []
+
+    with path.open("r", encoding="utf-8", newline="") as file:
+        rows = list(csv.DictReader(file))
+
+    return list(reversed(rows[-limit:]))
+
+
+def _settings_payload(settings: Settings) -> dict[str, str]:
+    return {
+        "SYMBOLS": ",".join(settings.symbols),
+        "ENABLED_EXCHANGES": ",".join(settings.enabled_exchanges),
+        "MIN_NET_SPREAD_PCT": str(settings.min_net_spread_pct),
+        "MIN_NET_PROFIT_QUOTE": str(settings.min_net_profit_quote),
+        "TRADE_SIZE_QUOTE": str(settings.trade_size_quote),
+        "SLIPPAGE_BPS": str(settings.slippage_bps),
+        "SNAPSHOT_CSV_PATH": settings.snapshot_csv_path,
+        "DEFAULT_TAKER_FEE_RATE": str(settings.default_taker_fee_rate),
+        "BINANCE_SPOT_FEE": str(settings.exchange_fee_rate.get("binance", settings.default_taker_fee_rate)),
+        "BYBIT_SPOT_FEE": str(settings.exchange_fee_rate.get("bybit", settings.default_taker_fee_rate)),
+        "OKX_SPOT_FEE": str(settings.exchange_fee_rate.get("okx", settings.default_taker_fee_rate)),
+        "KUCOIN_SPOT_FEE": str(settings.exchange_fee_rate.get("kucoin", settings.default_taker_fee_rate)),
+        "TELEGRAM_ENABLED": "true" if settings.telegram_enabled else "false",
+        "TELEGRAM_BOT_TOKEN": settings.telegram_bot_token,
+        "TELEGRAM_CHAT_ID": settings.telegram_chat_id,
+    }
+
+
+def _save_settings(payload: dict[str, str]) -> None:
+    _ensure_env_file()
+    for key, value in payload.items():
+        set_key(str(ENV_FILE), key, value)
+
+
+app = FastAPI(title="ArbBot Dashboard", version="0.1.0")
+app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
+templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+
+
+@app.get("/")
+def dashboard(request: Request) -> Any:
+    settings = _current_settings()
+    signals = _read_signals(settings.snapshot_csv_path)
+    status = _service_status()
+    return templates.TemplateResponse(
+        request,
+        "index.html",
+        {
+            "settings": _settings_payload(settings),
+            "signals": signals,
+            "service_status": status,
+            "scan_result": None,
+            "messages": [],
+        },
+    )
+
+
+@app.post("/settings")
+def update_settings(
+    request: Request,
+    symbols: str = Form(...),
+    enabled_exchanges: str = Form(...),
+    min_net_spread_pct: str = Form(...),
+    min_net_profit_quote: str = Form(...),
+    trade_size_quote: str = Form(...),
+    slippage_bps: str = Form(...),
+    snapshot_csv_path: str = Form(...),
+    default_taker_fee_rate: str = Form(...),
+    binance_spot_fee: str = Form(...),
+    bybit_spot_fee: str = Form(...),
+    okx_spot_fee: str = Form(...),
+    kucoin_spot_fee: str = Form(...),
+    telegram_enabled: str = Form("false"),
+    telegram_bot_token: str = Form(""),
+    telegram_chat_id: str = Form(""),
+) -> Any:
+    _save_settings(
+        {
+            "SYMBOLS": symbols,
+            "ENABLED_EXCHANGES": enabled_exchanges,
+            "MIN_NET_SPREAD_PCT": min_net_spread_pct,
+            "MIN_NET_PROFIT_QUOTE": min_net_profit_quote,
+            "TRADE_SIZE_QUOTE": trade_size_quote,
+            "SLIPPAGE_BPS": slippage_bps,
+            "SNAPSHOT_CSV_PATH": snapshot_csv_path,
+            "DEFAULT_TAKER_FEE_RATE": default_taker_fee_rate,
+            "BINANCE_SPOT_FEE": binance_spot_fee,
+            "BYBIT_SPOT_FEE": bybit_spot_fee,
+            "OKX_SPOT_FEE": okx_spot_fee,
+            "KUCOIN_SPOT_FEE": kucoin_spot_fee,
+            "TELEGRAM_ENABLED": telegram_enabled,
+            "TELEGRAM_BOT_TOKEN": telegram_bot_token,
+            "TELEGRAM_CHAT_ID": telegram_chat_id,
+        }
+    )
+    return RedirectResponse(url="/", status_code=303)
+
+
+@app.post("/scan-test")
+def scan_test(request: Request) -> Any:
+    settings = _current_settings()
+    scan_result: ScanResult = run_scan(settings, persist_candidates=False)
+    signals = _read_signals(settings.snapshot_csv_path)
+    status = _service_status()
+
+    return templates.TemplateResponse(
+        request,
+        "index.html",
+        {
+            "settings": _settings_payload(settings),
+            "signals": signals,
+            "service_status": status,
+            "scan_result": scan_result,
+            "messages": ["One-off scan finished from dashboard."],
+        },
+    )

@@ -1,56 +1,14 @@
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
-
 from rich.console import Console
 from rich.table import Table
 
 from interexchange_arbitrage.alerts import build_alert_message, send_telegram_alert
-from interexchange_arbitrage.engine import ArbitrageEngine
-from interexchange_arbitrage.exchanges import (
-    BinanceClient,
-    BybitClient,
-    ExchangeClient,
-    KucoinClient,
-    OkxClient,
-)
-from interexchange_arbitrage.models import ArbitrageOpportunity, TickerQuote
-from interexchange_arbitrage.persistence import append_opportunities_csv
+from interexchange_arbitrage.models import ArbitrageOpportunity
+from interexchange_arbitrage.scanner import run_scan
 from interexchange_arbitrage.settings import load_settings
 
 console = Console()
-
-
-EXCHANGE_CLIENTS: dict[str, type[ExchangeClient]] = {
-    "binance": BinanceClient,
-    "bybit": BybitClient,
-    "okx": OkxClient,
-    "kucoin": KucoinClient,
-}
-
-
-def build_clients(enabled_exchanges: list[str]) -> list[ExchangeClient]:
-    clients: list[ExchangeClient] = []
-    for exchange_name in enabled_exchanges:
-        client_cls = EXCHANGE_CLIENTS.get(exchange_name)
-        if client_cls is None:
-            console.print(f"[yellow]Unknown exchange skipped: {exchange_name}[/yellow]")
-            continue
-        clients.append(client_cls())
-
-    return clients
-
-
-def fetch_quotes_for_symbol(symbol: str, clients: list[ExchangeClient]) -> list[TickerQuote]:
-    quotes: list[TickerQuote] = []
-    with ThreadPoolExecutor(max_workers=len(clients)) as executor:
-        futures = [executor.submit(client.fetch_ticker, symbol) for client in clients]
-        for future in as_completed(futures):
-            try:
-                quotes.append(future.result())
-            except Exception as exc:  # noqa: BLE001
-                console.print(f"[yellow]Skip quote ({symbol}): {exc}[/yellow]")
-    return quotes
 
 
 def render_opportunities(opportunities: list[ArbitrageOpportunity]) -> None:
@@ -87,29 +45,15 @@ def render_opportunities(opportunities: list[ArbitrageOpportunity]) -> None:
 
 def main() -> None:
     settings = load_settings()
-    engine = ArbitrageEngine(settings)
-    clients = build_clients(settings.enabled_exchanges)
-    if len(clients) < 2:
-        console.print(
-            "[red]Need at least 2 enabled exchanges. Set ENABLED_EXCHANGES in .env.[/red]"
-        )
-        return
+    scan_result = run_scan(settings, persist_candidates=True)
 
-    all_opportunities: list[ArbitrageOpportunity] = []
-    all_candidates: list[ArbitrageOpportunity] = []
+    for warning in scan_result.warnings:
+        console.print(f"[yellow]{warning}[/yellow]")
 
-    for symbol in settings.symbols:
-        quotes = fetch_quotes_for_symbol(symbol, clients)
-        all_candidates.extend(engine.scan_symbol(quotes, apply_thresholds=False))
-        all_opportunities.extend(engine.scan_symbol(quotes, apply_thresholds=True))
-
-    # Persist full candidate set for post-run analysis, even if no filtered signal.
-    append_opportunities_csv(all_candidates, settings.snapshot_csv_path)
-
-    if all_opportunities:
-        render_opportunities(all_opportunities)
+    if scan_result.filtered_opportunities:
+        render_opportunities(scan_result.filtered_opportunities)
         if settings.telegram_enabled:
-            top = all_opportunities[0]
+            top = scan_result.filtered_opportunities[0]
             try:
                 send_telegram_alert(
                     settings.telegram_bot_token,
@@ -119,7 +63,7 @@ def main() -> None:
             except Exception as exc:  # noqa: BLE001
                 console.print(f"[yellow]Telegram alert failed: {exc}[/yellow]")
     else:
-        render_opportunities(all_candidates[:5])
+        render_opportunities(scan_result.all_candidates[:5])
         console.print("[cyan]No opportunities above threshold.[/cyan]")
 
 

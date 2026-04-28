@@ -59,6 +59,22 @@ ENABLED_EXCHANGES=okx,kucoin
 python main.py
 ```
 
+## Jalankan Web Dashboard
+
+Dashboard menyediakan:
+
+- Edit parameter scanner via browser (menulis ke `.env`)
+- Monitoring snapshot sinyal dari CSV
+- Trigger one-off scan untuk pengecekan cepat
+- Tampilan status service systemd (jika tersedia)
+
+```powershell
+$env:PYTHONPATH = "src"
+python dashboard.py
+```
+
+Lalu buka `http://localhost:8000`.
+
 ## Jalankan Test
 
 ```powershell

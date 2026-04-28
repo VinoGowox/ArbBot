@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ArbBot Dashboard</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <main class="layout">
+    <section class="hero card">
+      <h1>ArbBot Control Center</h1>
+      <p>Configure scanner parameters, trigger test run, and watch signal snapshots.</p>
+      <div class="status-row">
+        <span>Service status:</span>
+        <span class="badge {{ service_status }}">{{ service_status }}</span>
+      </div>
+      <form method="post" action="/scan-test">
+        <button type="submit">Run One-Off Scan</button>
+      </form>
+    </section>
+
+    {% if messages %}
+    <section class="card">
+      {% for message in messages %}
+      <p>{{ message }}</p>
+      {% endfor %}
+    </section>
+    {% endif %}
+
+    {% if scan_result %}
+    <section class="card">
+      <h2>Scan Result</h2>
+      <p>Filtered opportunities: {{ scan_result.filtered_opportunities|length }}</p>
+      <p>Candidate opportunities: {{ scan_result.all_candidates|length }}</p>
+      {% if scan_result.warnings %}
+      <ul>
+        {% for warning in scan_result.warnings[:5] %}
+        <li>{{ warning }}</li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+    </section>
+    {% endif %}
+
+    <section class="card">
+      <h2>Scanner Settings</h2>
+      <form class="settings-grid" method="post" action="/settings">
+        <label>SYMBOLS<input name="symbols" value="{{ settings.SYMBOLS }}" /></label>
+        <label>ENABLED_EXCHANGES<input name="enabled_exchanges" value="{{ settings.ENABLED_EXCHANGES }}" /></label>
+        <label>MIN_NET_SPREAD_PCT<input name="min_net_spread_pct" value="{{ settings.MIN_NET_SPREAD_PCT }}" /></label>
+        <label>MIN_NET_PROFIT_QUOTE<input name="min_net_profit_quote" value="{{ settings.MIN_NET_PROFIT_QUOTE }}" /></label>
+        <label>TRADE_SIZE_QUOTE<input name="trade_size_quote" value="{{ settings.TRADE_SIZE_QUOTE }}" /></label>
+        <label>SLIPPAGE_BPS<input name="slippage_bps" value="{{ settings.SLIPPAGE_BPS }}" /></label>
+        <label>SNAPSHOT_CSV_PATH<input name="snapshot_csv_path" value="{{ settings.SNAPSHOT_CSV_PATH }}" /></label>
+        <label>DEFAULT_TAKER_FEE_RATE<input name="default_taker_fee_rate" value="{{ settings.DEFAULT_TAKER_FEE_RATE }}" /></label>
+        <label>BINANCE_SPOT_FEE<input name="binance_spot_fee" value="{{ settings.BINANCE_SPOT_FEE }}" /></label>
+        <label>BYBIT_SPOT_FEE<input name="bybit_spot_fee" value="{{ settings.BYBIT_SPOT_FEE }}" /></label>
+        <label>OKX_SPOT_FEE<input name="okx_spot_fee" value="{{ settings.OKX_SPOT_FEE }}" /></label>
+        <label>KUCOIN_SPOT_FEE<input name="kucoin_spot_fee" value="{{ settings.KUCOIN_SPOT_FEE }}" /></label>
+        <label>TELEGRAM_ENABLED<input name="telegram_enabled" value="{{ settings.TELEGRAM_ENABLED }}" /></label>
+        <label>TELEGRAM_BOT_TOKEN<input name="telegram_bot_token" value="{{ settings.TELEGRAM_BOT_TOKEN }}" /></label>
+        <label>TELEGRAM_CHAT_ID<input name="telegram_chat_id" value="{{ settings.TELEGRAM_CHAT_ID }}" /></label>
+        <div class="full">
+          <button type="submit">Save Settings</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="card">
+      <h2>Latest Signal Snapshots</h2>
+      {% if signals %}
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>run_at_utc</th>
+              <th>symbol</th>
+              <th>buy_exchange</th>
+              <th>sell_exchange</th>
+              <th>net_spread_pct</th>
+              <th>estimated_profit_quote</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in signals[:30] %}
+            <tr>
+              <td>{{ row.run_at_utc }}</td>
+              <td>{{ row.symbol }}</td>
+              <td>{{ row.buy_exchange }}</td>
+              <td>{{ row.sell_exchange }}</td>
+              <td>{{ row.net_spread_pct }}</td>
+              <td>{{ row.estimated_profit_quote }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p>No snapshot rows yet.</p>
+      {% endif %}
+    </section>
+  </main>
+</body>
+</html>
