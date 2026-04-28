@@ -4,6 +4,7 @@ set -euo pipefail
 APP_USER="${APP_USER:-arbbot}"
 APP_DIR="${APP_DIR:-/opt/interexchange-arbitrage/ArbBot}"
 BRANCH="${BRANCH:-main}"
+FAIL_ONESHOT_START="${FAIL_ONESHOT_START:-0}"
 
 if [[ "$(id -u)" -ne 0 ]]; then
   echo "This script must run as root (use sudo)." >&2
@@ -106,6 +107,17 @@ PY
 # Step 6: restart services only after preflight passes
 systemctl restart arbbot-dashboard
 systemctl restart interexchange-arbitrage.timer
-systemctl start interexchange-arbitrage.service
+
+# Optional smoke check for the oneshot scanner service.
+# A runtime/API hiccup should not break deploy by default.
+if ! systemctl start interexchange-arbitrage.service; then
+  echo "Warning: interexchange-arbitrage.service failed during smoke start." >&2
+  systemctl --no-pager --full status interexchange-arbitrage.service || true
+  journalctl -xeu interexchange-arbitrage.service --no-pager -n 120 || true
+  if [[ "$FAIL_ONESHOT_START" == "1" ]]; then
+    echo "FAIL_ONESHOT_START=1, failing deploy." >&2
+    exit 1
+  fi
+fi
 
 echo "Deploy completed"
