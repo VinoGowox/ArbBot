@@ -27,41 +27,13 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts
 
-      - name: Detect remote privilege mode
+      - name: Detect if remote user is root
         id: privilege
         shell: bash
-        env:
-          VPS_SUDO_PASSWORD: ${{ secrets.VPS_SUDO_PASSWORD }}
         run: |
           set -euo pipefail
-          mode="$(ssh -i ~/.ssh/id_ed25519 "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" '
-            if [ "$(id -u)" -eq 0 ]; then
-              echo root
-            elif sudo -n true >/dev/null 2>&1; then
-              echo sudo
-            else
-              echo none
-            fi
-          ')"
-
-          if [ "$mode" = "none" ] && [ -n "${VPS_SUDO_PASSWORD:-}" ]; then
-            mode="sudo-password"
-          fi
-
-          if [ "$mode" = "none" ]; then
-            echo "Remote user requires interactive sudo password and VPS_SUDO_PASSWORD secret is not set." >&2
-            echo "Set passwordless sudo, use root SSH user, or add secret VPS_SUDO_PASSWORD." >&2
-            echo "Example sudoers: deploy ALL=(root) NOPASSWD:/usr/bin/install,/usr/local/bin/arbbot-deploy.sh,/bin/systemctl" >&2
-            exit 1
-          fi
-
-          if [ "$mode" = "root" ]; then
-            echo "privilege_mode=root" >> "$GITHUB_OUTPUT"
-          elif [ "$mode" = "sudo" ]; then
-            echo "privilege_mode=sudo-n" >> "$GITHUB_OUTPUT"
-          else
-            echo "privilege_mode=sudo-password" >> "$GITHUB_OUTPUT"
-          fi
+          is_root="$(ssh -i ~/.ssh/id_ed25519 "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" 'if [ "$(id -u)" -eq 0 ]; then echo true; else echo false; fi')"
+          echo "is_root=$is_root" >> "$GITHUB_OUTPUT"
 
       - name: Upload deploy script
         shell: bash
@@ -75,12 +47,17 @@ jobs:
           VPS_SUDO_PASSWORD: ${{ secrets.VPS_SUDO_PASSWORD }}
         run: |
           set -euo pipefail
-          if [ "${{ steps.privilege.outputs.privilege_mode }}" = "root" ]; then
+          if [ "${{ steps.privilege.outputs.is_root }}" = "true" ]; then
             ssh -i ~/.ssh/id_ed25519 "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" "install -m 0755 /tmp/arbbot-deploy.sh /usr/local/bin/arbbot-deploy.sh; rm -f /tmp/arbbot-deploy.sh"
-          elif [ "${{ steps.privilege.outputs.privilege_mode }}" = "sudo-n" ]; then
-            ssh -i ~/.ssh/id_ed25519 "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" "sudo -n install -m 0755 /tmp/arbbot-deploy.sh /usr/local/bin/arbbot-deploy.sh; rm -f /tmp/arbbot-deploy.sh"
-          else
+          elif ssh -i ~/.ssh/id_ed25519 "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" "sudo -n install -m 0755 /tmp/arbbot-deploy.sh /usr/local/bin/arbbot-deploy.sh; rm -f /tmp/arbbot-deploy.sh"; then
+            echo "Installed with passwordless sudo"
+          elif [ -n "${VPS_SUDO_PASSWORD:-}" ]; then
             printf '%s\n' "$VPS_SUDO_PASSWORD" | ssh -i ~/.ssh/id_ed25519 "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" "sudo -S -p '' install -m 0755 /tmp/arbbot-deploy.sh /usr/local/bin/arbbot-deploy.sh; rm -f /tmp/arbbot-deploy.sh"
+          else
+            echo "Cannot run privileged install on VPS." >&2
+            echo "Configure sudoers for /usr/bin/install or set VPS_SUDO_PASSWORD secret." >&2
+            echo "Example: deploy ALL=(root) NOPASSWD:/usr/bin/install" >&2
+            exit 1
           fi
 
       - name: Run deploy on VPS
@@ -89,12 +66,17 @@ jobs:
           VPS_SUDO_PASSWORD: ${{ secrets.VPS_SUDO_PASSWORD }}
         run: |
           set -euo pipefail
-          if [ "${{ steps.privilege.outputs.privilege_mode }}" = "root" ]; then
-            ssh -i ~/.ssh/id_ed25519 "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" "env FAIL_ONESHOT_START=0 /usr/local/bin/arbbot-deploy.sh"
-          elif [ "${{ steps.privilege.outputs.privilege_mode }}" = "sudo-n" ]; then
-            ssh -i ~/.ssh/id_ed25519 "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" "sudo -n env FAIL_ONESHOT_START=0 /usr/local/bin/arbbot-deploy.sh"
+          if [ "${{ steps.privilege.outputs.is_root }}" = "true" ]; then
+            ssh -i ~/.ssh/id_ed25519 "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" "FAIL_ONESHOT_START=0 /usr/local/bin/arbbot-deploy.sh"
+          elif ssh -i ~/.ssh/id_ed25519 "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" "FAIL_ONESHOT_START=0 sudo -n /usr/local/bin/arbbot-deploy.sh"; then
+            echo "Deploy executed with passwordless sudo"
+          elif [ -n "${VPS_SUDO_PASSWORD:-}" ]; then
+            printf '%s\n' "$VPS_SUDO_PASSWORD" | ssh -i ~/.ssh/id_ed25519 "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" "FAIL_ONESHOT_START=0 sudo -S -p '' /usr/local/bin/arbbot-deploy.sh"
           else
-            printf '%s\n' "$VPS_SUDO_PASSWORD" | ssh -i ~/.ssh/id_ed25519 "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" "sudo -S -p '' env FAIL_ONESHOT_START=0 /usr/local/bin/arbbot-deploy.sh"
+            echo "Cannot run deploy script with current privileges." >&2
+            echo "Configure sudoers for /usr/local/bin/arbbot-deploy.sh or set VPS_SUDO_PASSWORD secret." >&2
+            echo "Example: deploy ALL=(root) NOPASSWD:/usr/local/bin/arbbot-deploy.sh" >&2
+            exit 1
           fi
 
       - name: Dump service diagnostics on failure
@@ -104,13 +86,14 @@ jobs:
           VPS_SUDO_PASSWORD: ${{ secrets.VPS_SUDO_PASSWORD }}
         run: |
           set +e
-          if [ "${{ steps.privilege.outputs.privilege_mode }}" = "root" ]; then
+          if [ "${{ steps.privilege.outputs.is_root }}" = "true" ]; then
             ssh -i ~/.ssh/id_ed25519 "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" "systemctl --no-pager --full status arbbot-dashboard interexchange-arbitrage.timer interexchange-arbitrage.service" || true
             ssh -i ~/.ssh/id_ed25519 "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" "journalctl -xeu interexchange-arbitrage.service --no-pager -n 200" || true
-          elif [ "${{ steps.privilege.outputs.privilege_mode }}" = "sudo-n" ]; then
-            ssh -i ~/.ssh/id_ed25519 "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" "sudo -n systemctl --no-pager --full status arbbot-dashboard interexchange-arbitrage.timer interexchange-arbitrage.service" || true
+          elif ssh -i ~/.ssh/id_ed25519 "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" "sudo -n systemctl --no-pager --full status arbbot-dashboard interexchange-arbitrage.timer interexchange-arbitrage.service"; then
             ssh -i ~/.ssh/id_ed25519 "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" "sudo -n journalctl -xeu interexchange-arbitrage.service --no-pager -n 200" || true
-          else
+          elif [ -n "${VPS_SUDO_PASSWORD:-}" ]; then
             printf '%s\n' "$VPS_SUDO_PASSWORD" | ssh -i ~/.ssh/id_ed25519 "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" "sudo -S -p '' systemctl --no-pager --full status arbbot-dashboard interexchange-arbitrage.timer interexchange-arbitrage.service" || true
             printf '%s\n' "$VPS_SUDO_PASSWORD" | ssh -i ~/.ssh/id_ed25519 "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" "sudo -S -p '' journalctl -xeu interexchange-arbitrage.service --no-pager -n 200" || true
+          else
+            echo "Diagnostics skipped: no root and no sudo access." >&2
           fi
