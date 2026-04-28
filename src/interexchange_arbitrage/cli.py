@@ -6,11 +6,37 @@ from rich.console import Console
 from rich.table import Table
 
 from interexchange_arbitrage.engine import ArbitrageEngine
-from interexchange_arbitrage.exchanges import BinanceClient, BybitClient, ExchangeClient
+from interexchange_arbitrage.exchanges import (
+    BinanceClient,
+    BybitClient,
+    ExchangeClient,
+    KucoinClient,
+    OkxClient,
+)
 from interexchange_arbitrage.models import ArbitrageOpportunity, TickerQuote
 from interexchange_arbitrage.settings import load_settings
 
 console = Console()
+
+
+EXCHANGE_CLIENTS: dict[str, type[ExchangeClient]] = {
+    "binance": BinanceClient,
+    "bybit": BybitClient,
+    "okx": OkxClient,
+    "kucoin": KucoinClient,
+}
+
+
+def build_clients(enabled_exchanges: list[str]) -> list[ExchangeClient]:
+    clients: list[ExchangeClient] = []
+    for exchange_name in enabled_exchanges:
+        client_cls = EXCHANGE_CLIENTS.get(exchange_name)
+        if client_cls is None:
+            console.print(f"[yellow]Unknown exchange skipped: {exchange_name}[/yellow]")
+            continue
+        clients.append(client_cls())
+
+    return clients
 
 
 def fetch_quotes_for_symbol(symbol: str, clients: list[ExchangeClient]) -> list[TickerQuote]:
@@ -58,7 +84,12 @@ def render_opportunities(opportunities: list[ArbitrageOpportunity]) -> None:
 def main() -> None:
     settings = load_settings()
     engine = ArbitrageEngine(settings)
-    clients: list[ExchangeClient] = [BinanceClient(), BybitClient()]
+    clients = build_clients(settings.enabled_exchanges)
+    if len(clients) < 2:
+        console.print(
+            "[red]Need at least 2 enabled exchanges. Set ENABLED_EXCHANGES in .env.[/red]"
+        )
+        return
 
     all_opportunities: list[ArbitrageOpportunity] = []
 

@@ -1,6 +1,6 @@
 # Inter-Exchange Spot Arbitrage - Week 1
 
-Implementasi Week 1 untuk scanner peluang arbitrase spot antar exchange (Binance vs Bybit) dengan fokus:
+Implementasi Week 1 untuk scanner peluang arbitrase spot antar exchange dengan fokus:
 
 - Pengambilan top-of-book (`bid`/`ask`) via public API
 - Standardisasi simbol (`BTC/USDT` style)
@@ -30,9 +30,19 @@ $env:PYTHONPATH = "src"
 Salin `.env.example` ke `.env`, lalu sesuaikan:
 
 - `SYMBOLS` contoh: `BTC/USDT,ETH/USDT,SOL/USDT`
+- `ENABLED_EXCHANGES` contoh: `okx,kucoin` atau `binance,bybit`
 - `MIN_NET_SPREAD_PCT` contoh: `0.2`
 - `DEFAULT_TAKER_FEE_RATE` default: `0.001`
-- `BINANCE_SPOT_FEE` dan `BYBIT_SPOT_FEE` opsional
+- Fee per exchange opsional: `BINANCE_SPOT_FEE`, `BYBIT_SPOT_FEE`, `OKX_SPOT_FEE`, `KUCOIN_SPOT_FEE`
+
+## Catatan Akses API Exchange
+
+Beberapa VPS region/IP bisa dibatasi oleh exchange tertentu (mis. HTTP 451/403). Jika itu terjadi,
+ubah `ENABLED_EXCHANGES` ke kombinasi exchange yang dapat diakses dari VPS Anda, misalnya:
+
+```env
+ENABLED_EXCHANGES=okx,kucoin
+```
 
 ## Jalankan Scanner
 

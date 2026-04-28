@@ -8,6 +8,7 @@ from interexchange_arbitrage.settings import Settings
 def test_scan_symbol_returns_net_profitable_opportunity() -> None:
     settings = Settings(
         symbols=["BTC/USDT"],
+        enabled_exchanges=["binance", "bybit"],
         min_net_spread_pct=0.2,
         default_taker_fee_rate=0.001,
         exchange_fee_rate={"binance": 0.001, "bybit": 0.001},

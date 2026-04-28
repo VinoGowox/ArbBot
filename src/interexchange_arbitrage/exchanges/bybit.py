@@ -20,7 +20,7 @@ class BybitClient(ExchangeClient):
         exchange_symbol = self._to_exchange_symbol(symbol)
         url = f"{self._base_url}/v5/market/tickers"
 
-        with httpx.Client(timeout=10.0) as client:
+        with httpx.Client(timeout=10.0, headers={"User-Agent": "ArbBot/1.0"}) as client:
             response = client.get(
                 url,
                 params={"category": "spot", "symbol": exchange_symbol},
