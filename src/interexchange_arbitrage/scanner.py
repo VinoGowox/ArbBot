@@ -12,6 +12,8 @@ from interexchange_arbitrage.exchanges import (
     OkxClient,
 )
 from interexchange_arbitrage.models import ArbitrageOpportunity, TickerQuote
+from interexchange_arbitrage.models import PaperTrade, PortfolioSummary
+from interexchange_arbitrage.paper_trading import PaperTradingEngine
 from interexchange_arbitrage.persistence import append_opportunities_csv
 from interexchange_arbitrage.settings import Settings
 
@@ -29,6 +31,8 @@ class ScanResult:
     filtered_opportunities: list[ArbitrageOpportunity]
     all_candidates: list[ArbitrageOpportunity]
     warnings: list[str]
+    executed_paper_trades: list[PaperTrade]
+    portfolio_summary: PortfolioSummary | None
 
 
 def build_clients(enabled_exchanges: list[str]) -> tuple[list[ExchangeClient], list[str]]:
@@ -67,7 +71,13 @@ def run_scan(settings: Settings, *, persist_candidates: bool = True) -> ScanResu
     clients, warnings = build_clients(settings.enabled_exchanges)
     if len(clients) < 2:
         warnings.append("Need at least 2 enabled exchanges. Set ENABLED_EXCHANGES in .env.")
-        return ScanResult(filtered_opportunities=[], all_candidates=[], warnings=warnings)
+        return ScanResult(
+            filtered_opportunities=[],
+            all_candidates=[],
+            warnings=warnings,
+            executed_paper_trades=[],
+            portfolio_summary=None,
+        )
 
     engine = ArbitrageEngine(settings)
     filtered_opportunities: list[ArbitrageOpportunity] = []
@@ -82,6 +92,14 @@ def run_scan(settings: Settings, *, persist_candidates: bool = True) -> ScanResu
     if persist_candidates:
         append_opportunities_csv(all_candidates, settings.snapshot_csv_path)
 
+    executed_paper_trades: list[PaperTrade] = []
+    portfolio_summary: PortfolioSummary | None = None
+    if settings.paper_trading_enabled:
+        paper_engine = PaperTradingEngine(settings)
+        executed_paper_trades, portfolio_summary = paper_engine.execute(
+            filtered_opportunities
+        )
+
     filtered_opportunities.sort(key=lambda item: item.net_spread_pct, reverse=True)
     all_candidates.sort(key=lambda item: item.net_spread_pct, reverse=True)
 
@@ -89,4 +107,6 @@ def run_scan(settings: Settings, *, persist_candidates: bool = True) -> ScanResu
         filtered_opportunities=filtered_opportunities,
         all_candidates=all_candidates,
         warnings=warnings,
+        executed_paper_trades=executed_paper_trades,
+        portfolio_summary=portfolio_summary,
     )

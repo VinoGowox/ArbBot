@@ -1,6 +1,6 @@
-# Inter-Exchange Spot Arbitrage - Week 1-2
+# Inter-Exchange Spot Arbitrage - Week 1-3
 
-Implementasi Week 1-2 untuk scanner peluang arbitrase spot antar exchange dengan fokus:
+Implementasi Week 1-3 untuk scanner peluang arbitrase spot antar exchange dengan fokus:
 
 - Pengambilan top-of-book (`bid`/`ask`) via public API
 - Standardisasi simbol (`BTC/USDT` style)
@@ -10,6 +10,7 @@ Implementasi Week 1-2 untuk scanner peluang arbitrase spot antar exchange dengan
 - Output peluang dalam bentuk tabel CLI
 - Snapshot data peluang ke CSV
 - Alert Telegram opsional untuk sinyal teratas
+- Paper trading engine: portfolio state per exchange, simulated execution, dan PnL ledger
 
 ## Struktur
 
@@ -41,6 +42,13 @@ Salin `.env.example` ke `.env`, lalu sesuaikan:
 - `SNAPSHOT_CSV_PATH` contoh: `data/arbitrage_opportunities.csv`
 - `TELEGRAM_ENABLED` `true/false`
 - `TELEGRAM_BOT_TOKEN` dan `TELEGRAM_CHAT_ID` jika alert aktif
+- `PAPER_TRADING_ENABLED` `true/false`
+- `PAPER_STATE_PATH` contoh: `data/paper_portfolio.json`
+- `PAPER_TRADES_CSV_PATH` contoh: `data/paper_trades.csv`
+- `PAPER_INITIAL_QUOTE_BALANCE` contoh: `10000`
+- `PAPER_INITIAL_BASE_BALANCE` contoh: `0.1`
+- `PAPER_MAX_QUOTE_PER_TRADE` contoh: `1000`
+- `PAPER_COOLDOWN_SECONDS` contoh: `60`
 - `DEFAULT_TAKER_FEE_RATE` default: `0.001`
 - Fee per exchange opsional: `BINANCE_SPOT_FEE`, `BYBIT_SPOT_FEE`, `OKX_SPOT_FEE`, `KUCOIN_SPOT_FEE`
 

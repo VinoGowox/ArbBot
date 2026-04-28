@@ -63,6 +63,10 @@
           <p class="kpi-label">Latest Profit Quote</p>
           <p class="kpi-value">{{ "%.4f"|format(latest_profit_quote) }}</p>
         </article>
+        <article class="panel kpi">
+          <p class="kpi-label">Paper Realized PnL</p>
+          <p class="kpi-value">{{ "%.4f"|format(paper_portfolio.total_realized_profit_quote) }}</p>
+        </article>
       </section>
 
       <section class="charts-grid">
@@ -152,6 +156,34 @@
             <input type="hidden" name="telegram_enabled" id="telegramEnabledInput" value="{{ settings.TELEGRAM_ENABLED }}" />
           </div>
 
+          <div class="control-group full telegram-row">
+            <p class="control-title">Paper Trading</p>
+            <label class="toggle">
+              <input type="checkbox" id="paperTradingToggle" {% if settings.PAPER_TRADING_ENABLED == "true" %}checked{% endif %} />
+              <span>Enable paper trading simulation</span>
+            </label>
+            <input type="hidden" name="paper_trading_enabled" id="paperTradingEnabledInput" value="{{ settings.PAPER_TRADING_ENABLED }}" />
+          </div>
+
+          <label>Paper State Path
+            <input name="paper_state_path" value="{{ settings.PAPER_STATE_PATH }}" />
+          </label>
+          <label>Paper Trades CSV Path
+            <input name="paper_trades_csv_path" value="{{ settings.PAPER_TRADES_CSV_PATH }}" />
+          </label>
+          <label>Initial Quote Balance / Exchange
+            <input type="number" step="0.01" name="paper_initial_quote_balance" value="{{ settings.PAPER_INITIAL_QUOTE_BALANCE }}" />
+          </label>
+          <label>Initial Base Balance / Symbol
+            <input type="number" step="0.0001" name="paper_initial_base_balance" value="{{ settings.PAPER_INITIAL_BASE_BALANCE }}" />
+          </label>
+          <label>Max Quote Per Trade
+            <input type="number" step="0.01" name="paper_max_quote_per_trade" value="{{ settings.PAPER_MAX_QUOTE_PER_TRADE }}" />
+          </label>
+          <label>Cooldown Seconds
+            <input type="number" step="1" name="paper_cooldown_seconds" value="{{ settings.PAPER_COOLDOWN_SECONDS }}" />
+          </label>
+
           <label>Telegram Bot Token
             <input name="telegram_bot_token" value="{{ settings.TELEGRAM_BOT_TOKEN }}" />
           </label>
@@ -196,6 +228,49 @@
         </div>
         {% else %}
         <p class="empty">No snapshot rows yet.</p>
+        {% endif %}
+      </section>
+
+      <section class="panel">
+        <h3>Paper Portfolio</h3>
+        <div class="scan-summary">
+          <p><strong>Total Quote Balance:</strong> {{ "%.4f"|format(paper_portfolio.total_quote_balance) }}</p>
+          <p><strong>Executed Trades:</strong> {{ paper_portfolio.total_executed_trades }}</p>
+          <p><strong>Realized PnL:</strong> {{ "%.4f"|format(paper_portfolio.total_realized_profit_quote) }}</p>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h3>Latest Paper Trades</h3>
+        {% if paper_trades %}
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>run_at_utc</th>
+                <th>symbol</th>
+                <th>buy_exchange</th>
+                <th>sell_exchange</th>
+                <th>base_size</th>
+                <th>estimated_profit_quote</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in paper_trades[:20] %}
+              <tr>
+                <td>{{ row.run_at_utc }}</td>
+                <td><span class="chip">{{ row.symbol }}</span></td>
+                <td>{{ row.buy_exchange }}</td>
+                <td>{{ row.sell_exchange }}</td>
+                <td>{{ row.base_size }}</td>
+                <td>{{ row.estimated_profit_quote }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <p class="empty">No paper trade rows yet.</p>
         {% endif %}
       </section>
 
@@ -298,6 +373,16 @@
       };
       telegramToggle.addEventListener('change', syncTelegram);
       syncTelegram();
+    }
+
+    const paperTradingToggle = document.getElementById('paperTradingToggle');
+    const paperTradingHidden = document.getElementById('paperTradingEnabledInput');
+    if (paperTradingToggle && paperTradingHidden) {
+      const syncPaperTrading = () => {
+        paperTradingHidden.value = paperTradingToggle.checked ? 'true' : 'false';
+      };
+      paperTradingToggle.addEventListener('change', syncPaperTrading);
+      syncPaperTrading();
     }
   </script>
 </body>

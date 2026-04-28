@@ -5,6 +5,18 @@ from interexchange_arbitrage.models import TickerQuote
 from interexchange_arbitrage.settings import Settings
 
 
+def _settings_base() -> dict:
+    return {
+        "paper_trading_enabled": False,
+        "paper_state_path": "data/paper_state_test.json",
+        "paper_trades_csv_path": "data/paper_trades_test.csv",
+        "paper_initial_quote_balance": 10000.0,
+        "paper_initial_base_balance": 0.1,
+        "paper_max_quote_per_trade": 1000.0,
+        "paper_cooldown_seconds": 60,
+    }
+
+
 def test_scan_symbol_returns_net_profitable_opportunity() -> None:
     settings = Settings(
         symbols=["BTC/USDT"],
@@ -17,6 +29,7 @@ def test_scan_symbol_returns_net_profitable_opportunity() -> None:
         telegram_enabled=False,
         telegram_bot_token="",
         telegram_chat_id="",
+        **_settings_base(),
         default_taker_fee_rate=0.001,
         exchange_fee_rate={"binance": 0.001, "bybit": 0.001},
     )
@@ -61,6 +74,7 @@ def test_scan_symbol_respects_min_net_profit_quote_threshold() -> None:
         telegram_enabled=False,
         telegram_bot_token="",
         telegram_chat_id="",
+        **_settings_base(),
         default_taker_fee_rate=0.0,
         exchange_fee_rate={"binance": 0.0, "bybit": 0.0},
     )

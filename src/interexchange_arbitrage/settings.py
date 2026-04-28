@@ -19,6 +19,13 @@ class Settings:
     telegram_enabled: bool
     telegram_bot_token: str
     telegram_chat_id: str
+    paper_trading_enabled: bool
+    paper_state_path: str
+    paper_trades_csv_path: str
+    paper_initial_quote_balance: float
+    paper_initial_base_balance: float
+    paper_max_quote_per_trade: float
+    paper_cooldown_seconds: int
     default_taker_fee_rate: float
     exchange_fee_rate: dict[str, float]
 
@@ -74,6 +81,13 @@ def load_settings(
     telegram_enabled = _parse_bool(get_value("TELEGRAM_ENABLED", "false"))
     telegram_bot_token = get_value("TELEGRAM_BOT_TOKEN", "")
     telegram_chat_id = get_value("TELEGRAM_CHAT_ID", "")
+    paper_trading_enabled = _parse_bool(get_value("PAPER_TRADING_ENABLED", "true"))
+    paper_state_path = get_value("PAPER_STATE_PATH", "data/paper_portfolio.json")
+    paper_trades_csv_path = get_value("PAPER_TRADES_CSV_PATH", "data/paper_trades.csv")
+    paper_initial_quote_balance = float(get_value("PAPER_INITIAL_QUOTE_BALANCE", "10000"))
+    paper_initial_base_balance = float(get_value("PAPER_INITIAL_BASE_BALANCE", "0.1"))
+    paper_max_quote_per_trade = float(get_value("PAPER_MAX_QUOTE_PER_TRADE", "1000"))
+    paper_cooldown_seconds = int(get_value("PAPER_COOLDOWN_SECONDS", "60"))
     default_taker_fee_rate = float(get_value("DEFAULT_TAKER_FEE_RATE", "0.001"))
 
     exchange_fee_rate = {
@@ -94,6 +108,13 @@ def load_settings(
         telegram_enabled=telegram_enabled,
         telegram_bot_token=telegram_bot_token,
         telegram_chat_id=telegram_chat_id,
+        paper_trading_enabled=paper_trading_enabled,
+        paper_state_path=paper_state_path,
+        paper_trades_csv_path=paper_trades_csv_path,
+        paper_initial_quote_balance=paper_initial_quote_balance,
+        paper_initial_base_balance=paper_initial_base_balance,
+        paper_max_quote_per_trade=paper_max_quote_per_trade,
+        paper_cooldown_seconds=paper_cooldown_seconds,
         default_taker_fee_rate=default_taker_fee_rate,
         exchange_fee_rate=exchange_fee_rate,
     )
