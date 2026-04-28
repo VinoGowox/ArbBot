@@ -43,4 +43,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ssh -i ~/.ssh/id_ed25519 "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" "sudo /usr/local/bin/arbbot-deploy.sh"
+          ssh -i ~/.ssh/id_ed25519 "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" "sudo env FAIL_ONESHOT_START=0 /usr/local/bin/arbbot-deploy.sh"
+
+      - name: Dump service diagnostics on failure
+        if: failure()
+        shell: bash
+        run: |
+          set +e
+          ssh -i ~/.ssh/id_ed25519 "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" "sudo systemctl --no-pager --full status arbbot-dashboard interexchange-arbitrage.timer interexchange-arbitrage.service"
+          ssh -i ~/.ssh/id_ed25519 "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" "sudo journalctl -xeu interexchange-arbitrage.service --no-pager -n 200"

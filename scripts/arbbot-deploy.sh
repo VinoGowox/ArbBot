@@ -110,7 +110,12 @@ systemctl restart interexchange-arbitrage.timer
 
 # Optional smoke check for the oneshot scanner service.
 # A runtime/API hiccup should not break deploy by default.
-if ! systemctl start interexchange-arbitrage.service; then
+set +e
+systemctl start interexchange-arbitrage.service
+START_RC=$?
+set -e
+
+if [[ $START_RC -ne 0 ]]; then
   echo "Warning: interexchange-arbitrage.service failed during smoke start." >&2
   systemctl --no-pager --full status interexchange-arbitrage.service || true
   journalctl -xeu interexchange-arbitrage.service --no-pager -n 120 || true
