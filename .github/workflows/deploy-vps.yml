@@ -27,6 +27,33 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts
 
+      - name: Detect remote privilege mode
+        id: privilege
+        shell: bash
+        run: |
+          set -euo pipefail
+          mode="$(ssh -i ~/.ssh/id_ed25519 "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" '
+            if [ "$(id -u)" -eq 0 ]; then
+              echo root
+            elif sudo -n true >/dev/null 2>&1; then
+              echo sudo
+            else
+              echo none
+            fi
+          ')"
+
+          if [ "$mode" = "none" ]; then
+            echo "Remote user requires interactive sudo password. Configure passwordless sudo for deploy command or use root SSH user." >&2
+            echo "Example: deploy ALL=(root) NOPASSWD:/usr/bin/install,/usr/local/bin/arbbot-deploy.sh,/bin/systemctl" >&2
+            exit 1
+          fi
+
+          if [ "$mode" = "root" ]; then
+            echo "sudo_prefix=" >> "$GITHUB_OUTPUT"
+          else
+            echo "sudo_prefix=sudo -n" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Upload deploy script
         shell: bash
         run: |
@@ -37,18 +64,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ssh -i ~/.ssh/id_ed25519 "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" "sudo install -m 0755 /tmp/arbbot-deploy.sh /usr/local/bin/arbbot-deploy.sh; rm -f /tmp/arbbot-deploy.sh"
+          ssh -i ~/.ssh/id_ed25519 "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" "${{ steps.privilege.outputs.sudo_prefix }} install -m 0755 /tmp/arbbot-deploy.sh /usr/local/bin/arbbot-deploy.sh; rm -f /tmp/arbbot-deploy.sh"
 
       - name: Run deploy on VPS
         shell: bash
         run: |
           set -euo pipefail
-          ssh -i ~/.ssh/id_ed25519 "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" "sudo env FAIL_ONESHOT_START=0 /usr/local/bin/arbbot-deploy.sh"
+          ssh -i ~/.ssh/id_ed25519 "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" "${{ steps.privilege.outputs.sudo_prefix }} env FAIL_ONESHOT_START=0 /usr/local/bin/arbbot-deploy.sh"
 
       - name: Dump service diagnostics on failure
         if: failure()
         shell: bash
         run: |
           set +e
-          ssh -i ~/.ssh/id_ed25519 "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" "sudo systemctl --no-pager --full status arbbot-dashboard interexchange-arbitrage.timer interexchange-arbitrage.service"
-          ssh -i ~/.ssh/id_ed25519 "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" "sudo journalctl -xeu interexchange-arbitrage.service --no-pager -n 200"
+          ssh -i ~/.ssh/id_ed25519 "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" "${{ steps.privilege.outputs.sudo_prefix }} systemctl --no-pager --full status arbbot-dashboard interexchange-arbitrage.timer interexchange-arbitrage.service" || true
+          ssh -i ~/.ssh/id_ed25519 "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" "${{ steps.privilege.outputs.sudo_prefix }} journalctl -xeu interexchange-arbitrage.service --no-pager -n 200" || true
