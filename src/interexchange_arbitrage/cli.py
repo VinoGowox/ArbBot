@@ -5,6 +5,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from rich.console import Console
 from rich.table import Table
 
+from interexchange_arbitrage.alerts import build_alert_message, send_telegram_alert
 from interexchange_arbitrage.engine import ArbitrageEngine
 from interexchange_arbitrage.exchanges import (
     BinanceClient,
@@ -14,6 +15,7 @@ from interexchange_arbitrage.exchanges import (
     OkxClient,
 )
 from interexchange_arbitrage.models import ArbitrageOpportunity, TickerQuote
+from interexchange_arbitrage.persistence import append_opportunities_csv
 from interexchange_arbitrage.settings import load_settings
 
 console = Console()
@@ -56,7 +58,7 @@ def render_opportunities(opportunities: list[ArbitrageOpportunity]) -> None:
         console.print("[cyan]No opportunities above threshold.[/cyan]")
         return
 
-    table = Table(title="Inter-Exchange Spot Arbitrage (Week 1)")
+    table = Table(title="Inter-Exchange Spot Arbitrage (Week 2)")
     table.add_column("Symbol")
     table.add_column("Buy")
     table.add_column("Sell")
@@ -64,7 +66,8 @@ def render_opportunities(opportunities: list[ArbitrageOpportunity]) -> None:
     table.add_column("Bid", justify="right")
     table.add_column("Gross %", justify="right")
     table.add_column("Net %", justify="right")
-    table.add_column("Est. Profit/Unit", justify="right")
+    table.add_column("Size (Quote)", justify="right")
+    table.add_column("Est. Profit", justify="right")
 
     for item in opportunities:
         table.add_row(
@@ -75,7 +78,8 @@ def render_opportunities(opportunities: list[ArbitrageOpportunity]) -> None:
             f"{item.sell_price:.6f}",
             f"{item.gross_spread_pct:.3f}",
             f"{item.net_spread_pct:.3f}",
-            f"{item.estimated_profit_per_unit:.6f}",
+            f"{item.trade_size_quote:.2f}",
+            f"{item.estimated_profit_quote:.6f}",
         )
 
     console.print(table)
@@ -92,12 +96,31 @@ def main() -> None:
         return
 
     all_opportunities: list[ArbitrageOpportunity] = []
+    all_candidates: list[ArbitrageOpportunity] = []
 
     for symbol in settings.symbols:
         quotes = fetch_quotes_for_symbol(symbol, clients)
-        all_opportunities.extend(engine.scan_symbol(quotes))
+        all_candidates.extend(engine.scan_symbol(quotes, apply_thresholds=False))
+        all_opportunities.extend(engine.scan_symbol(quotes, apply_thresholds=True))
 
-    render_opportunities(all_opportunities)
+    # Persist full candidate set for post-run analysis, even if no filtered signal.
+    append_opportunities_csv(all_candidates, settings.snapshot_csv_path)
+
+    if all_opportunities:
+        render_opportunities(all_opportunities)
+        if settings.telegram_enabled:
+            top = all_opportunities[0]
+            try:
+                send_telegram_alert(
+                    settings.telegram_bot_token,
+                    settings.telegram_chat_id,
+                    build_alert_message(top),
+                )
+            except Exception as exc:  # noqa: BLE001
+                console.print(f"[yellow]Telegram alert failed: {exc}[/yellow]")
+    else:
+        render_opportunities(all_candidates[:5])
+        console.print("[cyan]No opportunities above threshold.[/cyan]")
 
 
 if __name__ == "__main__":

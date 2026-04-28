@@ -10,6 +10,13 @@ def test_scan_symbol_returns_net_profitable_opportunity() -> None:
         symbols=["BTC/USDT"],
         enabled_exchanges=["binance", "bybit"],
         min_net_spread_pct=0.2,
+        min_net_profit_quote=0.0,
+        trade_size_quote=1000.0,
+        slippage_bps=0.0,
+        snapshot_csv_path="data/test.csv",
+        telegram_enabled=False,
+        telegram_bot_token="",
+        telegram_chat_id="",
         default_taker_fee_rate=0.001,
         exchange_fee_rate={"binance": 0.001, "bybit": 0.001},
     )
@@ -39,3 +46,43 @@ def test_scan_symbol_returns_net_profitable_opportunity() -> None:
     assert top.buy_exchange == "binance"
     assert top.sell_exchange == "bybit"
     assert top.net_spread_pct > 0.2
+    assert top.estimated_profit_quote > 0
+
+
+def test_scan_symbol_respects_min_net_profit_quote_threshold() -> None:
+    settings = Settings(
+        symbols=["BTC/USDT"],
+        enabled_exchanges=["binance", "bybit"],
+        min_net_spread_pct=-10.0,
+        min_net_profit_quote=5.0,
+        trade_size_quote=1000.0,
+        slippage_bps=0.0,
+        snapshot_csv_path="data/test.csv",
+        telegram_enabled=False,
+        telegram_bot_token="",
+        telegram_chat_id="",
+        default_taker_fee_rate=0.0,
+        exchange_fee_rate={"binance": 0.0, "bybit": 0.0},
+    )
+    engine = ArbitrageEngine(settings)
+
+    quotes = [
+        TickerQuote(
+            exchange="binance",
+            symbol="BTC/USDT",
+            bid=100.0,
+            ask=100.0,
+            timestamp=datetime.now(timezone.utc),
+        ),
+        TickerQuote(
+            exchange="bybit",
+            symbol="BTC/USDT",
+            bid=100.1,
+            ask=100.2,
+            timestamp=datetime.now(timezone.utc),
+        ),
+    ]
+
+    opportunities = engine.scan_symbol(quotes)
+
+    assert opportunities == []
