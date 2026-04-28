@@ -225,6 +225,11 @@ h3 {
   color: var(--ok);
 }
 
+.badge.degraded {
+  background: #fffaeb;
+  color: #b54708;
+}
+
 .badge.inactive,
 .badge.failed,
 .badge.unknown {

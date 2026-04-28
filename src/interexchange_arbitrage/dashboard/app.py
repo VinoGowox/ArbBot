@@ -45,10 +45,17 @@ def _current_settings() -> Settings:
     return load_settings(env_file=str(ENV_FILE))
 
 
-def _service_status() -> str:
+def _resolve_path(path_value: str) -> Path:
+    path = Path(path_value)
+    if path.is_absolute():
+        return path
+    return PROJECT_ROOT / path
+
+
+def _systemctl_state(unit_name: str, verb: str = "is-active") -> str:
     try:
         result = subprocess.run(
-            ["systemctl", "is-active", SERVICE_NAME],
+            ["systemctl", verb, unit_name],
             capture_output=True,
             text=True,
             check=False,
@@ -58,13 +65,34 @@ def _service_status() -> str:
         return "unknown"
 
     value = (result.stdout or result.stderr).strip().lower()
-    if not value:
-        return "unknown"
-    return value
+    return value if value else "unknown"
+
+
+def _service_status() -> str:
+    base_name = SERVICE_NAME.removesuffix(".service").removesuffix(".timer")
+    service_unit = f"{base_name}.service"
+    timer_unit = f"{base_name}.timer"
+
+    timer_state = _systemctl_state(timer_unit)
+    service_state = _systemctl_state(service_unit)
+    failed_state = _systemctl_state(service_unit, "is-failed")
+
+    if timer_state == "active":
+        if failed_state == "failed":
+            return "degraded"
+        return "active"
+
+    if service_state == "active":
+        return "active"
+    if failed_state == "failed":
+        return "failed"
+    if timer_state == "inactive" and service_state == "inactive":
+        return "inactive"
+    return "unknown"
 
 
 def _read_signals(csv_path: str, limit: int = 30) -> list[dict[str, str]]:
-    path = Path(csv_path)
+    path = _resolve_path(csv_path)
     if not path.exists() or path.stat().st_size == 0:
         return []
 
@@ -96,26 +124,45 @@ def _build_chart_data(signals: list[dict[str, str]]) -> dict[str, list[float] | 
     }
 
 
-def _read_paper_portfolio(path_value: str) -> dict[str, Any]:
-    path = Path(path_value)
+def _read_paper_portfolio(settings: Settings) -> dict[str, Any]:
+    path = _resolve_path(settings.paper_state_path)
+    initial_total_quote = (
+        settings.paper_initial_quote_balance * max(len(settings.enabled_exchanges), 1)
+        if settings.paper_trading_enabled
+        else 0.0
+    )
+
     if not path.exists():
         return {
-            "total_quote_balance": 0.0,
+            "total_quote_balance": initial_total_quote,
             "total_executed_trades": 0,
             "total_realized_profit_quote": 0.0,
         }
 
-    payload = json.loads(path.read_text(encoding="utf-8"))
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, ValueError):
+        return {
+            "total_quote_balance": initial_total_quote,
+            "total_executed_trades": 0,
+            "total_realized_profit_quote": 0.0,
+        }
+
     quote_balances = payload.get("quote_balances", {})
+    total_quote_balance = (
+        sum(float(v) for v in quote_balances.values())
+        if quote_balances
+        else initial_total_quote
+    )
     return {
-        "total_quote_balance": sum(float(v) for v in quote_balances.values()),
+        "total_quote_balance": total_quote_balance,
         "total_executed_trades": int(payload.get("total_executed_trades", 0)),
         "total_realized_profit_quote": float(payload.get("total_realized_profit_quote", 0.0)),
     }
 
 
 def _read_paper_trades(path_value: str, limit: int = 20) -> list[dict[str, str]]:
-    path = Path(path_value)
+    path = _resolve_path(path_value)
     if not path.exists() or path.stat().st_size == 0:
         return []
 
@@ -138,7 +185,7 @@ def _dashboard_context(
     latest_profit_quote = (
         _safe_float(signals[0].get("estimated_profit_quote")) if signals else 0.0
     )
-    paper_portfolio = _read_paper_portfolio(settings.paper_state_path)
+    paper_portfolio = _read_paper_portfolio(settings)
     paper_trades = _read_paper_trades(settings.paper_trades_csv_path)
 
     return {
