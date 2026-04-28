@@ -23,7 +23,7 @@
       </nav>
       <section class="side-card">
         <p class="side-label">Service</p>
-        <span class="badge {{ service_status }}">{{ service_status }}</span>
+        <span id="serviceBadge" class="badge {{ service_status }}">{{ service_status }}</span>
       </section>
       <form method="post" action="/scan-test" class="scan-form">
         <button type="submit">Run Scan</button>
@@ -53,19 +53,19 @@
       <section class="kpi-grid">
         <article class="panel kpi">
           <p class="kpi-label">Snapshot Rows</p>
-          <p class="kpi-value">{{ signals|length }}</p>
+          <p id="snapshotRowsValue" class="kpi-value">{{ signals|length }}</p>
         </article>
         <article class="panel kpi">
           <p class="kpi-label">Latest Net Spread %</p>
-          <p class="kpi-value">{{ "%.4f"|format(latest_net_spread) }}</p>
+          <p id="latestNetSpreadValue" class="kpi-value">{{ "%.4f"|format(latest_net_spread) }}</p>
         </article>
         <article class="panel kpi">
           <p class="kpi-label">Latest Profit Quote</p>
-          <p class="kpi-value">{{ "%.4f"|format(latest_profit_quote) }}</p>
+          <p id="latestProfitQuoteValue" class="kpi-value">{{ "%.4f"|format(latest_profit_quote) }}</p>
         </article>
         <article class="panel kpi">
           <p class="kpi-label">Paper Realized PnL</p>
-          <p class="kpi-value">{{ "%.4f"|format(paper_portfolio.total_realized_profit_quote) }}</p>
+          <p id="paperRealizedPnlValue" class="kpi-value">{{ "%.4f"|format(paper_portfolio.total_realized_profit_quote) }}</p>
         </article>
       </section>
 
@@ -199,7 +199,6 @@
 
       <section id="signals" class="panel">
         <h3>Latest Signal Snapshots</h3>
-        {% if signals %}
         <div class="table-wrap">
           <table>
             <thead>
@@ -212,7 +211,7 @@
                 <th>estimated_profit_quote</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody id="signalsTableBody">
               {% for row in signals[:30] %}
               <tr>
                 <td>{{ row.run_at_utc }}</td>
@@ -226,23 +225,20 @@
             </tbody>
           </table>
         </div>
-        {% else %}
-        <p class="empty">No snapshot rows yet.</p>
-        {% endif %}
+        <p id="signalsEmpty" class="empty" {% if signals %}style="display:none"{% endif %}>No snapshot rows yet.</p>
       </section>
 
       <section class="panel">
         <h3>Paper Portfolio</h3>
         <div class="scan-summary">
-          <p><strong>Total Quote Balance:</strong> {{ "%.4f"|format(paper_portfolio.total_quote_balance) }}</p>
-          <p><strong>Executed Trades:</strong> {{ paper_portfolio.total_executed_trades }}</p>
-          <p><strong>Realized PnL:</strong> {{ "%.4f"|format(paper_portfolio.total_realized_profit_quote) }}</p>
+          <p><strong>Total Quote Balance:</strong> <span id="paperTotalQuote">{{ "%.4f"|format(paper_portfolio.total_quote_balance) }}</span></p>
+          <p><strong>Executed Trades:</strong> <span id="paperExecutedTrades">{{ paper_portfolio.total_executed_trades }}</span></p>
+          <p><strong>Realized PnL:</strong> <span id="paperRealizedPnl">{{ "%.4f"|format(paper_portfolio.total_realized_profit_quote) }}</span></p>
         </div>
       </section>
 
       <section class="panel">
         <h3>Latest Paper Trades</h3>
-        {% if paper_trades %}
         <div class="table-wrap">
           <table>
             <thead>
@@ -255,7 +251,7 @@
                 <th>estimated_profit_quote</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody id="paperTradesTableBody">
               {% for row in paper_trades[:20] %}
               <tr>
                 <td>{{ row.run_at_utc }}</td>
@@ -269,9 +265,7 @@
             </tbody>
           </table>
         </div>
-        {% else %}
-        <p class="empty">No paper trade rows yet.</p>
-        {% endif %}
+        <p id="paperTradesEmpty" class="empty" {% if paper_trades %}style="display:none"{% endif %}>No paper trade rows yet.</p>
       </section>
 
       <footer class="app-footer">
@@ -299,8 +293,9 @@
     };
 
     const netSpreadCtx = document.getElementById('netSpreadChart');
+    let netSpreadChart = null;
     if (netSpreadCtx) {
-      new Chart(netSpreadCtx, {
+      netSpreadChart = new Chart(netSpreadCtx, {
         type: 'line',
         data: {
           labels: chartData.labels,
@@ -318,8 +313,9 @@
     }
 
     const profitCtx = document.getElementById('profitChart');
+    let profitChart = null;
     if (profitCtx) {
-      new Chart(profitCtx, {
+      profitChart = new Chart(profitCtx, {
         type: 'line',
         data: {
           labels: chartData.labels,
@@ -335,6 +331,145 @@
         options: baseChartOptions
       });
     }
+
+    const serviceBadge = document.getElementById('serviceBadge');
+    const snapshotRowsValue = document.getElementById('snapshotRowsValue');
+    const latestNetSpreadValue = document.getElementById('latestNetSpreadValue');
+    const latestProfitQuoteValue = document.getElementById('latestProfitQuoteValue');
+    const paperRealizedPnlValue = document.getElementById('paperRealizedPnlValue');
+    const paperTotalQuote = document.getElementById('paperTotalQuote');
+    const paperExecutedTrades = document.getElementById('paperExecutedTrades');
+    const paperRealizedPnl = document.getElementById('paperRealizedPnl');
+    const signalsTableBody = document.getElementById('signalsTableBody');
+    const paperTradesTableBody = document.getElementById('paperTradesTableBody');
+
+    const number4 = (value) => Number(value || 0).toFixed(4);
+    const escapeHtml = (value) => String(value ?? '')
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#39;');
+
+    const ensureEmptyMessage = (id, text, visible, sectionId = null) => {
+      let node = document.getElementById(id);
+      if (!node) {
+        node = document.createElement('p');
+        node.id = id;
+        node.className = 'empty';
+        node.textContent = text;
+        const section = sectionId ? document.getElementById(sectionId) : null;
+        if (section) {
+          section.appendChild(node);
+        }
+      }
+      if (node) {
+        node.style.display = visible ? '' : 'none';
+      }
+    };
+
+    const renderSignalsRows = (rows) => {
+      if (!signalsTableBody) return;
+      if (!rows || rows.length === 0) {
+        signalsTableBody.innerHTML = '';
+        ensureEmptyMessage('signalsEmpty', 'No snapshot rows yet.', true, 'signals');
+        return;
+      }
+      ensureEmptyMessage('signalsEmpty', 'No snapshot rows yet.', false, 'signals');
+      signalsTableBody.innerHTML = rows.slice(0, 30).map((row) => `
+        <tr>
+          <td>${escapeHtml(row.run_at_utc)}</td>
+          <td><span class="chip">${escapeHtml(row.symbol)}</span></td>
+          <td>${escapeHtml(row.buy_exchange)}</td>
+          <td>${escapeHtml(row.sell_exchange)}</td>
+          <td>${escapeHtml(row.net_spread_pct)}</td>
+          <td>${escapeHtml(row.estimated_profit_quote)}</td>
+        </tr>
+      `).join('');
+    };
+
+    const renderPaperTradesRows = (rows) => {
+      if (!paperTradesTableBody) return;
+      let empty = document.getElementById('paperTradesEmpty');
+      if (!empty) {
+        empty = document.createElement('p');
+        empty.id = 'paperTradesEmpty';
+        empty.className = 'empty';
+        empty.textContent = 'No paper trade rows yet.';
+        const paperTradesSection = paperTradesTableBody.closest('section');
+        if (paperTradesSection) {
+          paperTradesSection.appendChild(empty);
+        }
+      }
+      if (!rows || rows.length === 0) {
+        paperTradesTableBody.innerHTML = '';
+        if (empty) empty.style.display = '';
+        return;
+      }
+      if (empty) empty.style.display = 'none';
+      paperTradesTableBody.innerHTML = rows.slice(0, 20).map((row) => `
+        <tr>
+          <td>${escapeHtml(row.run_at_utc)}</td>
+          <td><span class="chip">${escapeHtml(row.symbol)}</span></td>
+          <td>${escapeHtml(row.buy_exchange)}</td>
+          <td>${escapeHtml(row.sell_exchange)}</td>
+          <td>${escapeHtml(row.base_size)}</td>
+          <td>${escapeHtml(row.estimated_profit_quote)}</td>
+        </tr>
+      `).join('');
+    };
+
+    const applyLivePayload = (payload) => {
+      if (serviceBadge) {
+        serviceBadge.className = `badge ${payload.service_status || 'unknown'}`;
+        serviceBadge.textContent = payload.service_status || 'unknown';
+      }
+      if (snapshotRowsValue) snapshotRowsValue.textContent = String((payload.signals || []).length);
+      if (latestNetSpreadValue) latestNetSpreadValue.textContent = number4(payload.latest_net_spread);
+      if (latestProfitQuoteValue) latestProfitQuoteValue.textContent = number4(payload.latest_profit_quote);
+
+      const pf = payload.paper_portfolio || {};
+      if (paperRealizedPnlValue) paperRealizedPnlValue.textContent = number4(pf.total_realized_profit_quote);
+      if (paperTotalQuote) paperTotalQuote.textContent = number4(pf.total_quote_balance);
+      if (paperExecutedTrades) paperExecutedTrades.textContent = String(pf.total_executed_trades || 0);
+      if (paperRealizedPnl) paperRealizedPnl.textContent = number4(pf.total_realized_profit_quote);
+
+      renderSignalsRows(payload.signals || []);
+      renderPaperTradesRows(payload.paper_trades || []);
+
+      if (netSpreadChart && payload.chart_data) {
+        netSpreadChart.data.labels = payload.chart_data.labels || [];
+        netSpreadChart.data.datasets[0].data = payload.chart_data.net_spread || [];
+        netSpreadChart.update('none');
+      }
+      if (profitChart && payload.chart_data) {
+        profitChart.data.labels = payload.chart_data.labels || [];
+        profitChart.data.datasets[0].data = payload.chart_data.profit_quote || [];
+        profitChart.update('none');
+      }
+    };
+
+    let latestToken = '';
+    const refreshLiveData = async () => {
+      try {
+        const response = await fetch('/api/live', {
+          method: 'GET',
+          headers: { 'Accept': 'application/json' },
+          credentials: 'same-origin',
+          cache: 'no-store'
+        });
+        if (!response.ok) return;
+        const payload = await response.json();
+        const token = payload.update_token || '';
+        if (token && token === latestToken) return;
+        latestToken = token;
+        applyLivePayload(payload);
+      } catch (_err) {
+        // Keep current UI state when polling temporarily fails.
+      }
+    };
+
+    window.setInterval(refreshLiveData, 10000);
 
     const exchangeContainer = document.getElementById('exchangeSwitches');
     const hiddenExchangeInput = document.getElementById('enabledExchangesInput');
@@ -384,6 +519,8 @@
       paperTradingToggle.addEventListener('change', syncPaperTrading);
       syncPaperTrading();
     }
+
+    refreshLiveData();
   </script>
 </body>
 </html>

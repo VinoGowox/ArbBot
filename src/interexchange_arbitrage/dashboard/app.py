@@ -11,6 +11,7 @@ from typing import Any
 from dotenv import set_key
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
@@ -202,6 +203,34 @@ def _dashboard_context(
     }
 
 
+def _build_live_payload(settings: Settings) -> dict[str, Any]:
+    signals = _read_signals(settings.snapshot_csv_path)
+    status = _service_status()
+    chart_data = _build_chart_data(signals)
+    latest_net_spread = _safe_float(signals[0].get("net_spread_pct")) if signals else 0.0
+    latest_profit_quote = (
+        _safe_float(signals[0].get("estimated_profit_quote")) if signals else 0.0
+    )
+    paper_portfolio = _read_paper_portfolio(settings)
+    paper_trades = _read_paper_trades(settings.paper_trades_csv_path)
+    latest_run_at = signals[0].get("run_at_utc", "") if signals else ""
+    latest_trade_run_at = paper_trades[0].get("run_at_utc", "") if paper_trades else ""
+    update_token = (
+        f"{status}|{latest_run_at}|{latest_trade_run_at}|"
+        f"{len(signals)}|{paper_portfolio['total_executed_trades']}"
+    )
+    return {
+        "service_status": status,
+        "signals": signals,
+        "chart_data": chart_data,
+        "latest_net_spread": latest_net_spread,
+        "latest_profit_quote": latest_profit_quote,
+        "paper_portfolio": paper_portfolio,
+        "paper_trades": paper_trades,
+        "update_token": update_token,
+    }
+
+
 def _settings_payload(settings: Settings) -> dict[str, str]:
     return {
         "SYMBOLS": ",".join(settings.symbols),
@@ -390,3 +419,12 @@ def scan_test(request: Request) -> Any:
             ["One-off scan finished from dashboard."],
         ),
     )
+
+
+@app.get("/api/live")
+def live_data(request: Request) -> Any:
+    if not _is_authenticated(request):
+        return JSONResponse({"detail": "unauthorized"}, status_code=401)
+
+    settings = _current_settings()
+    return JSONResponse(_build_live_payload(settings))
