@@ -3,7 +3,7 @@ from __future__ import annotations
 import csv
 import json
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from interexchange_arbitrage.models import ArbitrageOpportunity, PaperTrade, PortfolioSummary
@@ -165,7 +165,7 @@ class PaperTradingEngine:
             )
             return [], summary
 
-        now = datetime.now(UTC)
+        now = datetime.now(timezone.utc)
         now_ts = now.timestamp()
         executed: list[PaperTrade] = []
 
