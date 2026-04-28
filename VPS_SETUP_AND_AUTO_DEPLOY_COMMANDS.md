@@ -270,11 +270,15 @@ chmod +x /usr/local/bin/arbbot-deploy.sh
 
 ```bash
 cat > /etc/sudoers.d/deploy-arbbot << 'EOF'
-deploy ALL=(root) NOPASSWD:/usr/local/bin/arbbot-deploy.sh,/bin/systemctl restart arbbot-dashboard,/bin/systemctl restart interexchange-arbitrage.timer,/bin/systemctl start interexchange-arbitrage.service
+deploy ALL=(root) NOPASSWD:/usr/bin/install,/usr/local/bin/arbbot-deploy.sh,/bin/systemctl,/usr/bin/journalctl
 EOF
 chmod 440 /etc/sudoers.d/deploy-arbbot
 visudo -cf /etc/sudoers.d/deploy-arbbot
 ```
+
+Catatan penting:
+- Baris `deploy ALL=(root) ...` adalah isi file sudoers, bukan command yang dijalankan langsung di shell.
+- Jalankan blok `cat > /etc/sudoers.d/deploy-arbbot << 'EOF' ... EOF` di atas sebagai root.
 
 ## 12) Tambahkan GitHub Secrets (di repository GitHub)
 
@@ -284,6 +288,7 @@ Buat secrets ini:
 - `VPS_HOST` = IP publik VPS
 - `VPS_USER` = deploy
 - `VPS_SSH_KEY` = isi private key `arbbot_deploy` (bukan .pub)
+- `VPS_SUDO_PASSWORD` = opsional, hanya jika Anda tidak memakai sudoers NOPASSWD
 
 ## 13) Buat workflow GitHub Actions auto-deploy
 
