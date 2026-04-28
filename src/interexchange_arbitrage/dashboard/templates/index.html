@@ -28,6 +28,9 @@
       <form method="post" action="/scan-test" class="scan-form">
         <button type="submit">Run Scan</button>
       </form>
+      <form method="post" action="/logout" class="logout-form">
+        <button type="submit" class="ghost-btn">Logout</button>
+      </form>
     </aside>
 
     <main class="main-content">
@@ -35,7 +38,7 @@
         <div>
           <p class="eyebrow">Inter-Exchange Spot Arbitrage</p>
           <h2>Operational Dashboard</h2>
-          <p class="subtitle">Modernized monitoring workspace for scanner health, spread behavior, and run snapshots.</p>
+          <p class="subtitle">Monitoring workspace for scanner health, spread behavior, and run snapshots.</p>
         </div>
       </section>
 
@@ -92,7 +95,7 @@
 
       <section id="settings" class="panel">
         <h3>Scanner Settings</h3>
-        <p class="section-note">Use structured controls below. Exchange and Telegram status are now configured with switches.</p>
+        <p class="section-note">Use structured controls below. Setup tele bot if want to use Telegram Alerts.</p>
         <form class="settings-grid" method="post" action="/settings">
           <label>Symbols
             <textarea name="symbols" rows="2">{{ settings.SYMBOLS }}</textarea>
@@ -195,12 +198,20 @@
         <p class="empty">No snapshot rows yet.</p>
         {% endif %}
       </section>
+
+      <footer class="app-footer">
+        <p>ArbBot by kaka11</p>
+      </footer>
     </main>
   </div>
 
+  <script id="chartDataJson" type="application/json">{{ chart_data | tojson }}</script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
   <script>
-    const chartData = {{ chart_data | tojson }};
+    const chartDataElement = document.getElementById('chartDataJson');
+    const chartData = chartDataElement
+      ? JSON.parse(chartDataElement.textContent || '{"labels":[],"net_spread":[],"profit_quote":[]}')
+      : { labels: [], net_spread: [], profit_quote: [] };
 
     const baseChartOptions = {
       responsive: true,

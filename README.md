@@ -67,6 +67,13 @@ Dashboard menyediakan:
 - Monitoring snapshot sinyal dari CSV
 - Trigger one-off scan untuk pengecekan cepat
 - Tampilan status service systemd (jika tersedia)
+- Login session berbasis username/password
+
+Set environment berikut di VPS untuk login dashboard:
+
+- `DASHBOARD_USERNAME`
+- `DASHBOARD_PASSWORD`
+- `DASHBOARD_SESSION_SECRET`
 
 ```powershell
 $env:PYTHONPATH = "src"

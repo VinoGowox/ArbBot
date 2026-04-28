@@ -12,6 +12,7 @@ from fastapi import FastAPI, Form, Request
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.middleware.sessions import SessionMiddleware
 
 from interexchange_arbitrage.scanner import ScanResult, run_scan
 from interexchange_arbitrage.settings import Settings, load_settings
@@ -21,6 +22,12 @@ PROJECT_ROOT = BASE_DIR.parents[2]
 ENV_FILE = PROJECT_ROOT / ".env"
 ENV_EXAMPLE_FILE = PROJECT_ROOT / ".env.example"
 SERVICE_NAME = os.getenv("ARB_SERVICE_NAME", "interexchange-arbitrage")
+DASHBOARD_USERNAME = os.getenv("DASHBOARD_USERNAME", "admin")
+DASHBOARD_PASSWORD = os.getenv("DASHBOARD_PASSWORD", "changeme")
+DASHBOARD_SESSION_SECRET = os.getenv(
+    "DASHBOARD_SESSION_SECRET",
+    "change-this-dashboard-session-secret",
+)
 
 
 def _ensure_env_file() -> None:
@@ -140,13 +147,71 @@ def _save_settings(payload: dict[str, str]) -> None:
         set_key(str(ENV_FILE), key, value)
 
 
+def _is_authenticated(request: Request) -> bool:
+    return bool(request.session.get("dashboard_authenticated"))
+
+
+def _redirect_login() -> RedirectResponse:
+    return RedirectResponse(url="/login", status_code=303)
+
+
 app = FastAPI(title="ArbBot Dashboard", version="0.1.0")
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=DASHBOARD_SESSION_SECRET,
+    max_age=12 * 60 * 60,
+    same_site="lax",
+    https_only=False,
+)
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 
+@app.get("/login")
+def login_page(request: Request) -> Any:
+    if _is_authenticated(request):
+        return RedirectResponse(url="/", status_code=303)
+
+    return templates.TemplateResponse(
+        request,
+        "login.html",
+        {
+            "error": "",
+        },
+    )
+
+
+@app.post("/login")
+def login_submit(
+    request: Request,
+    username: str = Form(...),
+    password: str = Form(...),
+) -> Any:
+    if username == DASHBOARD_USERNAME and password == DASHBOARD_PASSWORD:
+        request.session["dashboard_authenticated"] = True
+        return RedirectResponse(url="/", status_code=303)
+
+    return templates.TemplateResponse(
+        request,
+        "login.html",
+        {
+            "error": "Invalid username or password.",
+        },
+        status_code=401,
+    )
+
+
+@app.post("/logout")
+def logout(request: Request) -> Any:
+    request.session.clear()
+    return RedirectResponse(url="/login", status_code=303)
+
+
 @app.get("/")
 def dashboard(request: Request) -> Any:
+    if not _is_authenticated(request):
+        return _redirect_login()
+
     settings = _current_settings()
     signals = _read_signals(settings.snapshot_csv_path)
     status = _service_status()
@@ -176,6 +241,9 @@ def update_settings(
     telegram_bot_token: str = Form(""),
     telegram_chat_id: str = Form(""),
 ) -> Any:
+    if not _is_authenticated(request):
+        return _redirect_login()
+
     _save_settings(
         {
             "SYMBOLS": symbols,
@@ -200,6 +268,9 @@ def update_settings(
 
 @app.post("/scan-test")
 def scan_test(request: Request) -> Any:
+    if not _is_authenticated(request):
+        return _redirect_login()
+
     settings = _current_settings()
     scan_result: ScanResult = run_scan(settings, persist_candidates=False)
     signals = _read_signals(settings.snapshot_csv_path)

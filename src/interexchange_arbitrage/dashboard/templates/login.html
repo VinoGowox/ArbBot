@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ArbBot Login</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body class="login-body">
+  <main class="login-shell">
+    <section class="login-card">
+      <p class="login-kicker">ArbBot Secure Access</p>
+      <h1>Operator Sign In</h1>
+      <p class="login-subtitle">Authenticate to open dashboard settings, chart analytics, and scanner controls.</p>
+
+      {% if error %}
+      <div class="login-error">{{ error }}</div>
+      {% endif %}
+
+      <form class="login-form" method="post" action="/login">
+        <label>Username
+          <input type="text" name="username" autocomplete="username" required />
+        </label>
+        <label>Password
+          <input type="password" name="password" autocomplete="current-password" required />
+        </label>
+        <button type="submit">Sign In</button>
+      </form>
+
+      <p class="login-meta">ArbBot by kaka11</p>
+    </section>
+  </main>
+</body>
+</html>
